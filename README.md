@@ -6,5 +6,5 @@ It does so without using the vSphere API, meaning it can be used on the free hyp
 
 
 ## Requirements
-+ python 2.7
++ python 3
 + paramiko

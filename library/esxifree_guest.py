@@ -110,13 +110,22 @@ options:
     - ' - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).'
   hostname:
     description:
-    - The hostname or IP address of the vSphere vCenter or ESXi server.
+    - The hostname or IP address of the ESXi server.
   username:
     description:
     - The username to access the ESXi server.
   password:
     description:
-    - The password of username of the ESXi server.
+    - The password of username for the ESXi server, or the password for the private key (if required).
+  pkeyfile:
+    description:
+    - The private key file for the user of the ESXi server.
+  pkeystr:
+    description:
+    - The private key (as a string) for the user of the ESXi server.
+  force:
+    description:
+    - Delete the existing host if it exists.
   networks:
     description:
     - A list of networks (in the order of the NICs).
@@ -162,8 +171,7 @@ EXAMPLES = r'''
   esxifree_guest:
     hostname: "{{ esxi_ip }}"
     username: "{{ esxi_username }}"
-    pkeyfile: "{{ esxi_pkey_file }}"
-    password: "{{ esxi_pkey_password }}"
+    pkeystr: "{{ esxi_pkey_nopw }}"
     datastore: "/vmfs/volumes/sata-raid10-4tb-01/"
     name: test_vm_0001
     state: poweredon
@@ -196,7 +204,7 @@ import collections
 import paramiko
 import sys
 import os
-import cStringIO
+import io
 
 # paramiko.util.log_to_file("paramiko.log")
 
@@ -208,10 +216,32 @@ except:
 
 # Executes a command on the remote host.
 class SSHCmdExec(object):
-    def __init__(self, hostname, username=None, password=None, pkeyfile=None):
+    def __init__(self, hostname, username=None, password=None, pkeyfile=None, pkeystr=None):
         self.hostname = hostname
-        self.pkeyfile = pkeyfile
-        self.remote_conn_client = None
+
+        try:
+            if pkeystr:
+                pkey_fromstr = paramiko.RSAKey.from_private_key(io.StringIO(pkeystr), password)
+            if pkeyfile:
+                pkey_fromfile = paramiko.RSAKey.from_private_key_file(pkeyfile, password)
+        except paramiko.ssh_exception.PasswordRequiredException as auth_err:
+            print("Authentication failure, Password required" + "\n\n" + str(auth_err))
+            exit(1)
+        except paramiko.ssh_exception.SSHException as auth_err:
+            print("Authentication failure, SSHException" + "\n\n" + str(auth_err))
+            exit(1)
+        except:
+            print("Unexpected error: ", sys.exc_info()[0])
+            raise
+        else:
+            if pkeystr:
+                self.pkey = pkey_fromstr
+                if pkeyfile:
+                    if pkey_fromstr != pkey_fromfile:
+                        print("Both private key file and private key string specified and not equal!")
+                        exit(1)
+            elif pkeyfile:
+                self.pkey = pkey_fromfile
 
         # Create instance of SSHClient object
         self.remote_conn_client = paramiko.SSHClient()
@@ -219,24 +249,18 @@ class SSHCmdExec(object):
 
         # initiate SSH connection
         try:
-            if pkeyfile:
-                if password:
-                    self.remote_conn_client.connect(hostname=hostname, username=username, key_filename=pkeyfile, password=password, timeout=10, look_for_keys=False, allow_agent=False)
-                else:
-                    self.remote_conn_client.connect(hostname=hostname, username=username, key_filename=pkeyfile, timeout=10, look_for_keys=False, allow_agent=False)
+            if self.pkey:
+                self.remote_conn_client.connect(hostname=hostname, username=username, pkey=self.pkey, timeout=10, look_for_keys=False, allow_agent=False)
             else:
                 self.remote_conn_client.connect(hostname=hostname, username=username, password=password, timeout=10, look_for_keys=False, allow_agent=False)
         except socket.error as sock_err:
-            print
-            "Connection timed-out to " + hostname  # + "\n\n" + str(sock_err)
+            print("Connection timed-out to " + hostname)  # + "\n\n" + str(sock_err)
             exit(1)
         except paramiko.ssh_exception.AuthenticationException as auth_err:
-            print
-            "Authentication failure, unable to connect to " + hostname + " as " + username  # + "\n\n" + str(auth_err)
+            print("Authentication failure, unable to connect to " + hostname + " as " + username)  # + "\n\n" + str(auth_err)
             exit(1)
         except:
-            print
-            "Unexpected error: ", sys.exc_info()[0]
+            print("Unexpected error: ", sys.exc_info()[0])
             raise
 
         # print("SSH connection established to " + hostname + " as " + username)
@@ -282,8 +306,8 @@ class esxiFreeScraper(object):
     vmx_skeleton['scsi0.virtualDev'] = "pvscsi"
     vmx_skeleton['scsi0.present'] = "TRUE"
 
-    def __init__(self, hostname, username='root', password=None, pkeyfile=None, vmName=None, vmId=None):
-        self.esxiCnx = SSHCmdExec(hostname=hostname, username=username, pkeyfile=pkeyfile, password=password)
+    def __init__(self, hostname, username='root', password=None, pkeyfile=None, pkeystr=None, vmName=None, vmId=None):
+        self.esxiCnx = SSHCmdExec(hostname=hostname, username=username, pkeyfile=pkeyfile, pkeystr=pkeystr, password=password)
         self.vmName, self.vmId = self.get_vm(vmName, vmId)
         if self.vmId is None:
             self.vmName = vmName
@@ -299,7 +323,7 @@ class esxiFreeScraper(object):
 
     def get_vmx(self, vmId):
         (stdin, stdout, stderr) = self.esxiCnx.exec_command("vim-cmd vmsvc/get.filelayout " + vmId + " | grep 'vmPathName = ' | sed -r 's/^\s+vmPathName = \"(.*?)\",/\\1/g'")
-        vmxPathName = stdout.read().lstrip("\r\n").rstrip(" \r\n")
+        vmxPathName = stdout.read().decode('UTF-8').lstrip("\r\n").rstrip(" \r\n")
         vmxPath = re.sub(r"^\[(.*?)]\s+(.*?)$", r"/vmfs/volumes/\1/\2", vmxPathName)
 
         if vmxPath:
@@ -307,7 +331,7 @@ class esxiFreeScraper(object):
             vmxFileDict = {}
             for line in sftp_cnx.file(vmxPath).readlines():
                 key, value = line.split("=")
-                vmxFileDict[key.strip(" \"\r\n")] = value.strip(" \"\r\n")
+                vmxFileDict[key.strip(" \"\r\n").lower()] = value.strip(" \"\r\n")
 
             return vmxFileDict
 
@@ -326,73 +350,73 @@ class esxiFreeScraper(object):
                 templ_vmxDict = self.get_vmx(templ_vmId)
 
                 # Generic settings
-                vmxDict.update({"guestOS": templ_vmxDict['guestOS']})
+                vmxDict.update({"guestos": templ_vmxDict['guestos']})
 
                 # Hardware settings
                 if 'numvcpus' in templ_vmxDict:
                     vmxDict.update({"numvcpus": templ_vmxDict['numvcpus']})
-                vmxDict.update({"memSize": templ_vmxDict['memSize']})
-                vmxDict.update({"virtualHW.version": templ_vmxDict['virtualHW.version']})
+                vmxDict.update({"memsize": templ_vmxDict['memsize']})
+                vmxDict.update({"virtualhw.version": templ_vmxDict['virtualhw.version']})
 
                 # Network settings
                 netCount = 0
-                while "ethernet" + str(netCount) + ".virtualDev" in templ_vmxDict:
-                    vmxDict.update({"ethernet" + str(netCount) + ".virtualDev": templ_vmxDict["ethernet" + str(netCount) + ".virtualDev"]})
-                    vmxDict.update({"ethernet" + str(netCount) + ".networkName": templ_vmxDict["ethernet" + str(netCount) + ".networkName"]})
-                    vmxDict.update({"ethernet" + str(netCount) + ".addressType": "generated"})
+                while "ethernet" + str(netCount) + ".virtualdev" in templ_vmxDict:
+                    vmxDict.update({"ethernet" + str(netCount) + ".virtualdev": templ_vmxDict["ethernet" + str(netCount) + ".virtualdev"]})
+                    vmxDict.update({"ethernet" + str(netCount) + ".networkname": templ_vmxDict["ethernet" + str(netCount) + ".networkname"]})
+                    vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
                     vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
                     netCount = netCount + 1
 
                 # Disk settings
                 diskCount = 0
-                while "scsi0:" + str(diskCount) + ".fileName" in templ_vmxDict:
+                while "scsi0:" + str(diskCount) + ".filename" in templ_vmxDict:
                     # See if vmTemplate disk exists
-                    (stdin, stdout, stderr) = self.esxiCnx.exec_command("find " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".fileName"])
+                    (stdin, stdout, stderr) = self.esxiCnx.exec_command("find " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"])
                     if stdout.channel.recv_exit_status() == 0:
                         disk_count_suffix = "_" + diskCount if diskCount > 0 else ""
                         disk_filename = self.vmName + disk_count_suffix + ".vmdk"
-                        (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -i " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".fileName"] + " -d thin" + " " + vmPath + "/" + disk_filename)
+                        (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -i " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"] + " -d thin" + " " + vmPath + "/" + disk_filename)
 
-                        vmxDict.update({"scsi0:" + str(diskCount) + ".deviceType": "scsi-hardDisk"})
+                        vmxDict.update({"scsi0:" + str(diskCount) + ".devicetype": "scsi-hardDisk"})
                         vmxDict.update({"scsi0:" + str(diskCount) + ".present": "TRUE"})
-                        vmxDict.update({"scsi0:" + str(diskCount) + ".fileName": disk_filename})
+                        vmxDict.update({"scsi0:" + str(diskCount) + ".filename": disk_filename})
                     diskCount = diskCount + 1
 
         # Now add remaining settings, overriding template copies.
 
         # Generic settings
         if guest_id:
-            vmxDict.update({"guestOS": guest_id})
-        vmxDict.update({"displayName": self.vmName})
-        vmxDict.update({"vm.createDate": time.time()})
+            vmxDict.update({"guestos": guest_id})
+        vmxDict.update({"displayname": self.vmName})
+        vmxDict.update({"vm.createdate": time.time()})
 
         # Hardware settings
         if 'version' in hardware:
-            vmxDict.update({"virtualHW.version": hardware['version']})
+            vmxDict.update({"virtualhw.version": hardware['version']})
         if 'memory_mb' in hardware:
-            vmxDict.update({"memSize": hardware['memory_mb']})
+            vmxDict.update({"memsize": hardware['memory_mb']})
         if 'num_cpus' in hardware:
             vmxDict.update({"numvcpus": hardware['num_cpus']})
 
         # CDROM settings
         if cdrom['type'] == 'client':
             (stdin, stdout, stderr) = self.esxiCnx.exec_command("find /vmfs/devices/cdrom/ -mindepth 1 ! -type l")
-            cdrom_dev = stdout.read().lstrip("\r\n").rstrip(" \r\n")
-            vmxDict.update({"ide0:0.deviceType": "atapi-cdrom"})
-            vmxDict.update({"ide0:0.fileName": cdrom_dev})
+            cdrom_dev = stdout.read().decode('UTF-8').lstrip("\r\n").rstrip(" \r\n")
+            vmxDict.update({"ide0:0.devicetype": "atapi-cdrom"})
+            vmxDict.update({"ide0:0.filename": cdrom_dev})
             vmxDict.update({"ide0:0.present": "TRUE"})
         elif cdrom['type'] == 'iso':
             if 'iso_path' in cdrom:
-                vmxDict.update({"ide0:0.deviceType": "cdrom-image"})
-                vmxDict.update({"ide0:0.fileName": cdrom['iso_path']})
+                vmxDict.update({"ide0:0.devicetype": "cdrom-image"})
+                vmxDict.update({"ide0:0.filename": cdrom['iso_path']})
                 vmxDict.update({"ide0:0.present": "TRUE"})
-                vmxDict.update({"ide0:0.startConnected": "TRUE"})
+                vmxDict.update({"ide0:0.startconnected": "TRUE"})
 
         # Network settings
         for netCount in range(0, len(networks)):
-            vmxDict.update({"ethernet" + str(netCount) + ".virtualDev": networks[netCount]['virtualDev']})
-            vmxDict.update({"ethernet" + str(netCount) + ".networkName": networks[netCount]['networkName']})
-            vmxDict.update({"ethernet" + str(netCount) + ".addressType": "generated"})
+            vmxDict.update({"ethernet" + str(netCount) + ".virtualdev": networks[netCount]['virtualDev']})
+            vmxDict.update({"ethernet" + str(netCount) + ".networkname": networks[netCount]['networkName']})
+            vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
             vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
 
         # Disk settings
@@ -402,15 +426,15 @@ class esxiFreeScraper(object):
 
             (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disks[diskCount]['size_gb']) + "G -d " + disks[diskCount]['type'] + " " + vmPath + "/" + disk_filename)
 
-            vmxDict.update({"scsi0:" + str(diskCount) + ".deviceType": "scsi-hardDisk"})
+            vmxDict.update({"scsi0:" + str(diskCount) + ".devicetype": "scsi-hardDisk"})
             vmxDict.update({"scsi0:" + str(diskCount) + ".present": "TRUE"})
-            vmxDict.update({"scsi0:" + str(diskCount) + ".fileName": disk_filename})
+            vmxDict.update({"scsi0:" + str(diskCount) + ".filename": disk_filename})
 
         # Dump the VMX
         # print(json.dumps(vmxDict, sort_keys=True, indent=4, separators=(',', ': ')))
-        vmxStr = cStringIO.StringIO()
+        vmxStr = io.StringIO()
         for vmxKey, vmxVal in vmxDict.items():
-            vmxStr.write(str(vmxKey) + " = " + "\"" + str(vmxVal) + "\"\n")
+            vmxStr.write(str(vmxKey.lower()) + " = " + "\"" + str(vmxVal) + "\"\n")
         vmxStr.seek(0)
         sftp_cnx = self.esxiCnx.get_sftpClient()
         sftp_cnx.putfo(vmxStr, vmPath + "/" + self.vmName + ".vmx", file_size=0, callback=None, confirm=True)
@@ -426,9 +450,11 @@ def main():
         "username": {"type": "str"},
         "password": {"type": "str", "required": False},
         "pkeyfile": {"type": "str", "required": False},
+        "pkeystr": {"type": "str", "required": False},
         "name": {"type": "str", "required": False},
         "vmid": {"type": "str", "required": False},
         "state": {"type": "str", "default": 'present', "choices": ['absent', 'poweredoff', 'poweredon', 'present', 'rebootguest', 'restarted', 'shutdownguest', 'suspended']},
+        "force": {"type": "bool", "default": False, "required": False},
         "template": {"type": "str", "required": False},
         "datastore": {"type": "str", "required": True},
         "hardware": {"type": "dict", "default": {}},
@@ -441,54 +467,64 @@ def main():
 
     # For testing on Windows without Ansible
     if os.name != 'nt':
-        module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True, required_one_of=[['name', 'vmid'], ['password', 'pkeyfile']])
+        module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True, required_one_of=[['name', 'vmid'], ['password', 'pkeyfile', 'pkeystr']])
     else:
         class cDummyAnsibleModule():
             ## Create blank VM
-            params = {
-                "hostname": "192.168.1.3",
-                "username": "root",
-                "pkeyfile": "../id_rsa_esxisvc_nopw",
-                "name": "dstest1",
-                "state": "poweredon",
-                "guest_id": "centos7-64",
-                "template": "",
-                "datastore": "/vmfs/volumes/sata-raid10-4tb-01/",
-                "hardware": {"version": "14", "num_cpus": "2", "memory_mb": "2048"},
-                "disk": [{"size_gb": "16", "type": "thin"}],
-                "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/sata-raid10-4tb-01/ISOs/CentOS-7-x86_64-Minimal-1810.iso"},
-                "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}],
-                "customvalues": []
-            }
-
-            ## Clone VM
             # params = {
             #     "hostname": "192.168.1.3",
             #     "username": "root",
             #     "pkeyfile": "../id_rsa_esxisvc_nopw",
+            #     "pkeystr": None,
+            #     "password": None,
             #     "name": "dstest1",
             #     "state": "poweredon",
-            #     "guest_id": "",
-            #     "template": "centos7-template",
+            #     "guest_id": "centos7-64",
+            #     "template": "",
             #     "datastore": "/vmfs/volumes/sata-raid10-4tb-01/",
-            #     "hardware": {},
-            #     "disk": [],
-            #     "cdrom": {"type": "client"},
-            #     "networks": [],
-            #     "customvalues": []
+            #     "hardware": {"version": "14", "num_cpus": "2", "memory_mb": "2048"},
+            #     "disk": [{"size_gb": "16", "type": "thin"}],
+            #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/sata-raid10-4tb-01/ISOs/CentOS-7-x86_64-Minimal-1810.iso"},
+            #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}],
+            #     "customvalues": [],
+            #     "vmId": None
             # }
+
+            ## Clone VM
+            params = {
+                "hostname": "192.168.1.3",
+                "username": "root",
+                "password": None,
+                "pkeyfile": "../id_rsa_esxisvc_nopw",
+                "pkeystr": None,
+                "name": "dstest1",
+                "state": "poweredon",
+                "force": True,
+                "guest_id": "",
+                "template": "ubuntu1804-packer-template",
+                "datastore": "/vmfs/volumes/sata-raid10-4tb-01/",
+                "hardware": {},
+                "disk": [],
+                "cdrom": {"type": "client"},
+                "networks": [],
+                "customvalues": [],
+                "vmId": None
+            }
 
             ## Delete VM
             # params = {
             #     "hostname": "192.168.1.3",
             #     "username": "root",
+            #     "password": None,
             #     "pkeyfile": "../id_rsa_esxisvc_nopw",
+            #     "pkeystr": None,
             #     "name": "dstest1",
-            #     "state": "absent"
+            #     "state": "absent",
+            #     "vmId": None
             # }
 
-            def exit_json(self, changed, meta):
-                print(changed, json.dumps(meta, sort_keys=True, indent=4, separators=(',', ': ')))
+            def exit_json(self, changed, **kwargs):
+                print(changed, json.dumps(kwargs, sort_keys=True, indent=4, separators=(',', ': ')))
 
             def fail_json(self, msg):
                 print("Failed: " + msg)
@@ -496,28 +532,54 @@ def main():
 
         module = cDummyAnsibleModule()
 
-    pyv = esxiFreeScraper(hostname=module.params['hostname'], username=module.params['username'], pkeyfile=module.params['pkeyfile'], vmName=module.params['name'])
+    pyv = esxiFreeScraper(hostname=module.params['hostname'],
+                          username=module.params['username'],
+                          password=module.params['password'],
+                          pkeyfile=module.params['pkeyfile'],
+                          pkeystr=module.params['pkeystr'],
+                          vmName=module.params['name'],
+                          vmId=module.params['vmId'])
+
     if pyv.vmId is None and pyv.vmName is None:
         module.fail_json(msg="If VM doesn't already exist, you must provide a name for it")
 
     # Check if the VM exists before continuing
-    if pyv.vmId:
-        if module.params['state'] == 'absent':
+    if module.params['state'] == 'absent':
+        if pyv.vmId:
             (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(pyv.vmId))
+            if stdout.channel.recv_exit_status() != 0:
+                module.fail_json(msg=str(stderr.read()))
+
             module.exit_json(changed=True, meta={"msg": "Deleted " + pyv.vmName + ": " + str(pyv.vmId)})
         else:
+            module.fail_json(msg="vm already absent")
+    elif module.params['state'] in ['present', 'poweredon']:
+        if pyv.vmId and module.params['force'] is False:
             module.fail_json(msg="vm already exists")
-    else:
-        if module.params['state'] == 'absent':
-            module.fail_json(msg="Cannot delete, vm doesn't exist")
-        else:
-            pyv.create_vm(module.params['template'], module.params['datastore'], module.params['hardware'], module.params['guest_id'], module.params['disk'], module.params['cdrom'], module.params['customvalues'], module.params['networks'])
+        elif pyv.vmId and module.params['force']:
+            (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(pyv.vmId))
+            if re.search('Powered on', stdout.read().decode('UTF-8')) is not None:
+                (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.off " + str(pyv.vmId))
+                if stdout.channel.recv_exit_status() != 0:
+                    module.fail_json(msg=str(stderr.read()))
 
-            if module.params['state'] == 'poweredon':
-                (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(pyv.vmId))
+            (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(pyv.vmId))
+            if stdout.channel.recv_exit_status() != 0:
+                module.fail_json(msg=str(stderr.read()))
 
-            module.exit_json(changed=True, meta={"msg": "Created " + module.params['name']})
+        pyv.create_vm(module.params['template'], module.params['datastore'], module.params['hardware'], module.params['guest_id'], module.params['disk'], module.params['cdrom'], module.params['customvalues'], module.params['networks'])
+
+        if module.params['state'] == 'poweredon':
+            (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(pyv.vmId))
+
+        (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/get.guest " + str(pyv.vmId))
+        if stdout.channel.recv_exit_status() != 0:
+            module.fail_json(msg=str(stderr.read()))
+        guest_info = stdout.read().decode('UTF-8')
+        vm_params = re.search('\s*hostName\s*=\s*(?P<hostname>.*?),.*\n\s*ipAddress\s*=\s*(?P<ip>.*?),.*', guest_info)
+
+        module.exit_json(changed=True, hostname=vm_params.group('hostname'), ipAddress=vm_params.group('ip'), msg="Created " + module.params['name'])
 
 
-if __name__ == '__main__':
-    main()
+        if __name__ == '__main__':
+            main()
