@@ -31,18 +31,8 @@ options:
        configurations conforms to task arguments.'
     - 'If C(state) is set to C(absent) and virtual machine exists, then the specified virtual machine
       is removed with its associated components.'
-    - 'If C(state) is set to one of the following C(poweredon), C(poweredoff), C(present), C(restarted), C(suspended)
-      and virtual machine does not exists, then virtual machine is deployed with given parameters.'
-    - 'If C(state) is set to C(poweredon) and virtual machine exists with powerstate other than powered on,
-      then the specified virtual machine is powered on.'
-    - 'If C(state) is set to C(poweredoff) and virtual machine exists with powerstate other than powered off,
-      then the specified virtual machine is powered off.'
-    - 'If C(state) is set to C(restarted) and virtual machine exists, then the virtual machine is restarted.'
-    - 'If C(state) is set to C(suspended) and virtual machine exists, then the virtual machine is set to suspended mode.'
-    - 'If C(state) is set to C(shutdownguest) and virtual machine exists, then the virtual machine is shutdown.'
-    - 'If C(state) is set to C(rebootguest) and virtual machine exists, then the virtual machine is rebooted.'
     default: present
-    choices: [ present, absent, poweredon, poweredoff, restarted, suspended, shutdownguest, rebootguest ]
+    choices: [ present, absent ]
   name:
     description:
     - Name of the virtual machine to work with.
@@ -140,6 +130,12 @@ options:
     - A custom value object takes two fields C(key) and C(value).
     - Incorrect key and values will be ignored.
     version_added: '2.3'
+  wait:
+    description:
+    - Wait for the instance to reach its desired state before returning.
+  wait_timeout:
+    description:
+    - How long before wait gives up, in seconds.
 extends_documentation_fragment: vmware.documentation
 '''
 EXAMPLES = r'''
@@ -273,7 +269,8 @@ class SSHCmdExec(object):
         # print("Command is: {0}".format(command_string))
 
         (stdin, stdout, stderr) = self.remote_conn_client.exec_command(command_string)
-        stdout.channel.recv_exit_status()  # Blocking call
+        if stdout.channel.recv_exit_status() != 0: # Blocking call
+            raise IOError(stderr.read())
 
         return stdin, stdout, stderr
 
@@ -371,16 +368,19 @@ class esxiFreeScraper(object):
                 diskCount = 0
                 while "scsi0:" + str(diskCount) + ".filename" in templ_vmxDict:
                     # See if vmTemplate disk exists
-                    (stdin, stdout, stderr) = self.esxiCnx.exec_command("find " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"])
-                    if stdout.channel.recv_exit_status() == 0:
+                    try:
+                        (stdin, stdout, stderr) = self.esxiCnx.exec_command("find " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"])
+                    except IOError as e:
+                        pass
+                    else:
                         disk_count_suffix = "_" + diskCount if diskCount > 0 else ""
                         disk_filename = self.vmName + disk_count_suffix + ".vmdk"
-                        (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -i " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"] + " -d thin" + " " + vmPath + "/" + disk_filename)
+                        self.esxiCnx.exec_command("vmkfstools -i " + datastore + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"] + " -d thin" + " " + vmPath + "/" + disk_filename)
 
                         vmxDict.update({"scsi0:" + str(diskCount) + ".devicetype": "scsi-hardDisk"})
                         vmxDict.update({"scsi0:" + str(diskCount) + ".present": "TRUE"})
                         vmxDict.update({"scsi0:" + str(diskCount) + ".filename": disk_filename})
-                    diskCount = diskCount + 1
+                        diskCount = diskCount + 1
 
         # Now add remaining settings, overriding template copies.
 
@@ -453,7 +453,7 @@ def main():
         "pkeystr": {"type": "str", "required": False},
         "name": {"type": "str", "required": False},
         "vmid": {"type": "str", "required": False},
-        "state": {"type": "str", "default": 'present', "choices": ['absent', 'poweredoff', 'poweredon', 'present', 'rebootguest', 'restarted', 'shutdownguest', 'suspended']},
+        "state": {"type": "str", "default": 'present', "choices": ['absent', 'present']},
         "force": {"type": "bool", "default": False, "required": False},
         "template": {"type": "str", "required": False},
         "datastore": {"type": "str", "required": True},
@@ -462,7 +462,9 @@ def main():
         "disk": {"type": "list", "default": []},
         "cdrom": {"type": "dict", "default": {"type": "client"}},
         "networks": {"type": "list", "default": []},
-        "customvalues": {"type": "list", "default": []}
+        "customvalues": {"type": "list", "default": []},
+        "wait": {"type": "bool", "default": True, "required": False},
+        "wait_timeout": {"type": "int", "default": 300, "required": False}
     }
 
     # For testing on Windows without Ansible
@@ -478,7 +480,7 @@ def main():
             #     "pkeystr": None,
             #     "password": None,
             #     "name": "dstest1",
-            #     "state": "poweredon",
+            #     "state": "present",
             #     "guest_id": "centos7-64",
             #     "template": "",
             #     "datastore": "/vmfs/volumes/sata-raid10-4tb-01/",
@@ -487,7 +489,9 @@ def main():
             #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/sata-raid10-4tb-01/ISOs/CentOS-7-x86_64-Minimal-1810.iso"},
             #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}],
             #     "customvalues": [],
-            #     "vmId": None
+            #     "vmId": None,
+            #     "wait": None,
+            #     "wait_timeout": None
             # }
 
             ## Clone VM
@@ -498,7 +502,7 @@ def main():
                 "pkeyfile": "../id_rsa_esxisvc_nopw",
                 "pkeystr": None,
                 "name": "dstest1",
-                "state": "poweredon",
+                "state": "present",
                 "force": True,
                 "guest_id": "",
                 "template": "ubuntu1804-packer-template",
@@ -508,7 +512,9 @@ def main():
                 "cdrom": {"type": "client"},
                 "networks": [],
                 "customvalues": [],
-                "vmId": None
+                "vmId": None,
+                "wait": True,
+                "wait_timeout": 300
             }
 
             ## Delete VM
@@ -520,7 +526,9 @@ def main():
             #     "pkeystr": None,
             #     "name": "dstest1",
             #     "state": "absent",
-            #     "vmId": None
+            #     "vmId": None,
+            #     "wait": None,
+            #     "wait_timeout": None
             # }
 
             def exit_json(self, changed, **kwargs):
@@ -546,40 +554,51 @@ def main():
     # Check if the VM exists before continuing
     if module.params['state'] == 'absent':
         if pyv.vmId:
-            (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(pyv.vmId))
-            if stdout.channel.recv_exit_status() != 0:
-                module.fail_json(msg=str(stderr.read()))
-
+            pyv.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(pyv.vmId))
             module.exit_json(changed=True, meta={"msg": "Deleted " + pyv.vmName + ": " + str(pyv.vmId)})
         else:
             module.fail_json(msg="vm already absent")
-    elif module.params['state'] in ['present', 'poweredon']:
+    elif module.params['state'] == 'present':
         if pyv.vmId and module.params['force'] is False:
             module.fail_json(msg="vm already exists")
         elif pyv.vmId and module.params['force']:
             (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(pyv.vmId))
             if re.search('Powered on', stdout.read().decode('UTF-8')) is not None:
-                (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.off " + str(pyv.vmId))
-                if stdout.channel.recv_exit_status() != 0:
-                    module.fail_json(msg=str(stderr.read()))
+                pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.off " + str(pyv.vmId))
 
-            (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(pyv.vmId))
-            if stdout.channel.recv_exit_status() != 0:
-                module.fail_json(msg=str(stderr.read()))
+            pyv.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(pyv.vmId))
 
         pyv.create_vm(module.params['template'], module.params['datastore'], module.params['hardware'], module.params['guest_id'], module.params['disk'], module.params['cdrom'], module.params['customvalues'], module.params['networks'])
 
-        if module.params['state'] == 'poweredon':
-            (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(pyv.vmId))
+        pyv.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(pyv.vmId))
 
-        (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/get.guest " + str(pyv.vmId))
-        if stdout.channel.recv_exit_status() != 0:
-            module.fail_json(msg=str(stderr.read()))
-        guest_info = stdout.read().decode('UTF-8')
-        vm_params = re.search('\s*hostName\s*=\s*(?P<hostname>.*?),.*\n\s*ipAddress\s*=\s*(?P<ip>.*?),.*', guest_info)
+        if module.params['wait']:
+            time_s = int(module.params['wait_timeout'])
 
-        module.exit_json(changed=True, hostname=vm_params.group('hostname'), ipAddress=vm_params.group('ip'), msg="Created " + module.params['name'])
+            while time_s > 0:
+                (stdin, stdout, stderr) = pyv.esxiCnx.exec_command("vim-cmd vmsvc/get.guest " + str(pyv.vmId))
+
+                guest_info = stdout.read().decode('UTF-8')
+                vm_params = re.search('\s*hostName\s*=\s*\"?(?P<hostname>.*?)\"?,.*\n\s*ipAddress\s*=\s*\"?(?P<ip>.*?)\"?,.*', guest_info)
+                if vm_params and vm_params.group('ip') != "<unset>" and vm_params.group('hostname') != "":
+                    break
+                else:
+                    time.sleep(1)
+                    time_s = time_s - 1
+
+            module.exit_json(changed=True,
+                             hostname=vm_params.group('hostname'),
+                             ipAddress=vm_params.group('ip'),
+                             vmName=module.params['name'],
+                             vmID=pyv.vmId)
+
+        else:
+            module.exit_json(changed=True,
+                             hostname="",
+                             ipAddress="",
+                             vmName=module.params['name'],
+                             vmID=pyv.vmId)
 
 
-        if __name__ == '__main__':
-            main()
+if __name__ == '__main__':
+    main()

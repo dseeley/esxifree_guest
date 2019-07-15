@@ -1,0 +1,487 @@
+---
+
+# https://code.vmware.com/apis/358/vsphere#/doc/vim.vm.GuestOsDescriptor.GuestOsIdentifier.html
+
+- asianux3_64Guest:
+    DescName: "Asianux Server 3 (64 bit)"
+    Since: "vSphere API 4.0"
+- asianux3Guest:
+    DescName: "Asianux Server 3"
+    Since: "vSphere API 4.0"
+- asianux4_64Guest:
+    DescName: "Asianux Server 4 (64 bit)"
+    Since: "vSphere API 4.0"
+- asianux4Guest:
+    DescName: "Asianux Server 4"
+    Since: "vSphere API 4.0"
+- asianux5_64Guest:
+    DescName: "Asianux Server 5 (64 bit)"
+    Since: "vSphere API 6.0"
+- asianux7_64Guest:
+    DescName: "Asianux Server 7 (64 bit)"
+    Since: "vSphere API 6.5"
+- asianux8_64Guest:
+    DescName: "Asianux Server 8 (64 bit)"
+    Since: "vSphere API 6.7"
+- centos6_64Guest:
+    DescName: "CentOS 6 (64-bit)"
+    Since: "vSphere API 6.5"
+- centos64Guest:
+    DescName: "CentOS 4/5 (64-bit)"
+    Since: "vSphere API 4.1"
+- centos6Guest:
+    DescName: "CentOS 6"
+    Since: "vSphere API 6.5"
+- centos7_64Guest:
+    DescName: "CentOS 7 (64-bit)"
+    Since: "vSphere API 6.5"
+- centos7Guest:
+    DescName: "CentOS 7"
+    Since: "vSphere API 6.5"
+- centos8_64Guest:
+    DescName: "CentOS 8 (64-bit)"
+    Since: "vSphere API 6.7"
+- centosGuest:
+    DescName: "CentOS 4/5"
+    Since: "vSphere API 4.1"
+- coreos64Guest:
+    DescName: "CoreOS Linux (64 bit)"
+    Since: "vSphere API 6.0"
+- darwin10_64Guest:
+    DescName: "Mac OS 10.6 (64 bit)"
+    Since: "vSphere API 5.0"
+- darwin10Guest:
+    DescName: "Mac OS 10.6"
+    Since: "vSphere API 5.0"
+- darwin11_64Guest:
+    DescName: "Mac OS 10.7 (64 bit)"
+    Since: "vSphere API 5.0"
+- darwin11Guest:
+    DescName: "Mac OS 10.7"
+    Since: "vSphere API 5.0"
+- darwin12_64Guest:
+    DescName: "Mac OS 10.8 (64 bit)"
+    Since: "vSphere API 5.5"
+- darwin13_64Guest:
+    DescName: "Mac OS 10.9 (64 bit)"
+    Since: "vSphere API 5.5"
+- darwin14_64Guest:
+    DescName: "Mac OS 10.10 (64 bit)"
+    Since: "vSphere API 6.0"
+- darwin15_64Guest:
+    DescName: "Mac OS 10.11 (64 bit)"
+    Since: "vSphere API 6.5"
+- darwin16_64Guest:
+    DescName: "Mac OS 10.12 (64 bit)"
+    Since: "vSphere API 6.5"
+- darwin17_64Guest:
+    DescName: "macOS 10.13 (64 bit)"
+    Since: "vSphere API 6.7"
+- darwin18_64Guest:
+    DescName: "macOS 10.14 (64 bit)"
+    Since: "vSphere API 6.7"
+- darwin64Guest:
+    DescName: "Mac OS 10.5 (64 bit)"
+    Since: "vSphere API 4.0"
+- darwinGuest:
+    DescName: "Mac OS 10.5"
+    Since: ""
+- debian10_64Guest:
+    DescName: "Debian GNU/Linux 10 (64 bit)"
+    Since: "vSphere API 6.5"
+- debian10Guest:
+    DescName: "Debian GNU/Linux 10"
+    Since: "vSphere API 6.5"
+- debian4_64Guest:
+    DescName: "Debian GNU/Linux 4 (64 bit)"
+    Since: "vSphere API 4.0"
+- debian4Guest:
+    DescName: "Debian GNU/Linux 4"
+    Since: "vSphere API 4.0"
+- debian5_64Guest:
+    DescName: "Debian GNU/Linux 5 (64 bit)"
+    Since: "vSphere API 4.0"
+- debian5Guest:
+    DescName: "Debian GNU/Linux 5"
+    Since: "vSphere API 4.0"
+- debian6_64Guest:
+    DescName: "Debian GNU/Linux 6 (64 bit)"
+    Since: "vSphere API 5.0"
+- debian6Guest:
+    DescName: "Debian GNU/Linux 6"
+    Since: "vSphere API 5.0"
+- debian7_64Guest:
+    DescName: "Debian GNU/Linux 7 (64 bit)"
+    Since: "vSphere API 5.5"
+- debian7Guest:
+    DescName: "Debian GNU/Linux 7"
+    Since: "vSphere API 5.5"
+- debian8_64Guest:
+    DescName: "Debian GNU/Linux 8 (64 bit)"
+    Since: "vSphere API 6.0"
+- debian8Guest:
+    DescName: "Debian GNU/Linux 8"
+    Since: "vSphere API 6.0"
+- debian9_64Guest:
+    DescName: "Debian GNU/Linux 9 (64 bit)"
+    Since: "vSphere API 6.5"
+- debian9Guest:
+    DescName: "Debian GNU/Linux 9"
+    Since: "vSphere API 6.5"
+- dosGuest:
+    DescName: MS-DOS.
+    Since: ""
+- eComStation2Guest:
+    DescName: "eComStation 2.0"
+    Since: "vSphere API 5.0"
+- eComStationGuest:
+    DescName: "eComStation 1.x"
+    Since: "vSphere API 4.1"
+- fedora64Guest:
+    DescName: "Fedora Linux (64 bit)"
+    Since: "vSphere API 5.1"
+- fedoraGuest:
+    DescName: "Fedora Linux"
+    Since: "vSphere API 5.1"
+- freebsd11_64Guest:
+    DescName: "FreeBSD 11 x64"
+    Since: "vSphere API 6.7"
+- freebsd11Guest:
+    DescName: "FreeBSD 11"
+    Since: "vSphere API 6.7"
+- freebsd12_64Guest:
+    DescName: "FreeBSD 12 x64"
+    Since: "vSphere API 6.7"
+- freebsd12Guest:
+    DescName: "FreeBSD 12"
+    Since: "vSphere API 6.7"
+- freebsd64Guest:
+    DescName: "FreeBSD x64"
+    Since: ""
+- freebsdGuest:
+    DescName: FreeBSD
+    Since: ""
+- genericLinuxGuest:
+    DescName: "Other Linux"
+    Since: "vSphere API 5.5"
+- mandrakeGuest:
+    DescName: "Mandrake Linux"
+    Since: "vSphere API 5.5"
+- mandriva64Guest:
+    DescName: "Mandriva Linux (64 bit)"
+    Since: "vSphere API 4.0"
+- mandrivaGuest:
+    DescName: "Mandriva Linux"
+    Since: "vSphere API 4.0"
+- netware4Guest:
+    DescName: "Novell NetWare 4"
+    Since: ""
+- netware5Guest:
+    DescName: "Novell NetWare 5.1"
+    Since: ""
+- netware6Guest:
+    DescName: "Novell NetWare 6.x"
+    Since: ""
+- nld9Guest:
+    DescName: "Novell Linux Desktop 9"
+    Since: ""
+- oesGuest:
+    DescName: "Open Enterprise Server"
+    Since: ""
+- openServer5Guest:
+    DescName: "SCO OpenServer 5"
+    Since: "vSphere API 4.0"
+- openServer6Guest:
+    DescName: "SCO OpenServer 6"
+    Since: "vSphere API 4.0"
+- opensuse64Guest:
+    DescName: "OpenSUSE Linux (64 bit)"
+    Since: "vSphere API 5.1"
+- opensuseGuest:
+    DescName: "OpenSUSE Linux"
+    Since: "vSphere API 5.1"
+- oracleLinux6_64Guest:
+    DescName: "Oracle 6 (64-bit)"
+    Since: "vSphere API 6.5"
+- oracleLinux64Guest:
+    DescName: "Oracle Linux 4/5 (64-bit)"
+    Since: "vSphere API 4.1"
+- oracleLinux6Guest:
+    DescName: "Oracle 6"
+    Since: "vSphere API 6.5"
+- oracleLinux7_64Guest:
+    DescName: "Oracle 7 (64-bit)"
+    Since: "vSphere API 6.5"
+- oracleLinux7Guest:
+    DescName: "Oracle 7"
+    Since: "vSphere API 6.5"
+- oracleLinux8_64Guest:
+    DescName: "Oracle 8 (64-bit)"
+    Since: "vSphere API 6.7"
+- oracleLinuxGuest:
+    DescName: "Oracle Linux 4/5"
+    Since: "vSphere API 4.1"
+- os2Guest:
+    DescName: OS/2
+    Since: ""
+- other24xLinux64Guest:
+    DescName: "Linux 2.4x Kernel (64 bit) (experimental)"
+    Since: ""
+- other24xLinuxGuest:
+    DescName: "Linux 2.4x Kernel"
+    Since: ""
+- other26xLinux64Guest:
+    DescName: "Linux 2.6x Kernel (64 bit) (experimental)"
+    Since: ""
+- other26xLinuxGuest:
+    DescName: "Linux 2.6x Kernel"
+    Since: ""
+- other3xLinux64Guest:
+    DescName: "Linux 3.x Kernel (64 bit)"
+    Since: "vSphere API 5.5"
+- other3xLinuxGuest:
+    DescName: "Linux 3.x Kernel"
+    Since: "vSphere API 5.5"
+- other4xLinux64Guest:
+    DescName: "Linux 4.x Kernel (64 bit)"
+    Since: "vSphere API 6.7"
+- other4xLinuxGuest:
+    DescName: "Linux 4.x Kernel"
+    Since: "vSphere API 6.7"
+- otherGuest:
+    DescName: "Other Operating System"
+    Since: ""
+- otherGuest64:
+    DescName: "Other Operating System (64 bit) (experimental)"
+    Since: ""
+- otherLinux64Guest:
+    DescName: "Linux (64 bit) (experimental)"
+    Since: ""
+- otherLinuxGuest:
+    DescName: "Linux 2.2x Kernel"
+    Since: ""
+- redhatGuest:
+    DescName: "Red Hat Linux 2.1"
+    Since: ""
+- rhel2Guest:
+    DescName: "Red Hat Enterprise Linux 2"
+    Since: ""
+- rhel3_64Guest:
+    DescName: "Red Hat Enterprise Linux 3 (64 bit)"
+    Since: ""
+- rhel3Guest:
+    DescName: "Red Hat Enterprise Linux 3"
+    Since: ""
+- rhel4_64Guest:
+    DescName: "Red Hat Enterprise Linux 4 (64 bit)"
+    Since: ""
+- rhel4Guest:
+    DescName: "Red Hat Enterprise Linux 4"
+    Since: ""
+- rhel5_64Guest:
+    DescName: "Red Hat Enterprise Linux 5 (64 bit) (experimental)"
+    Since: "VI API 2.5"
+- rhel5Guest:
+    DescName: "Red Hat Enterprise Linux 5"
+    Since: "VI API 2.5"
+- rhel6_64Guest:
+    DescName: "Red Hat Enterprise Linux 6 (64 bit)"
+    Since: "vSphere API 4.0"
+- rhel6Guest:
+    DescName: "Red Hat Enterprise Linux 6"
+    Since: "vSphere API 4.0"
+- rhel7_64Guest:
+    DescName: "Red Hat Enterprise Linux 7 (64 bit)"
+    Since: "vSphere API 5.5"
+- rhel7Guest:
+    DescName: "Red Hat Enterprise Linux 7"
+    Since: "vSphere API 5.5"
+- rhel8_64Guest:
+    DescName: "Red Hat Enterprise Linux 8 (64 bit)"
+    Since: "vSphere API 6.7"
+- sjdsGuest:
+    DescName: "Sun Java Desktop System"
+    Since: ""
+- sles10_64Guest:
+    DescName: "Suse Linux Enterprise Server 10 (64 bit) (experimental)"
+    Since: "VI API 2.5"
+- sles10Guest:
+    DescName: "Suse linux Enterprise Server 10"
+    Since: "VI API 2.5"
+- sles11_64Guest:
+    DescName: "Suse Linux Enterprise Server 11 (64 bit)"
+    Since: "vSphere API 4.0"
+- sles11Guest:
+    DescName: "Suse linux Enterprise Server 11"
+    Since: "vSphere API 4.0"
+- sles12_64Guest:
+    DescName: "Suse Linux Enterprise Server 12 (64 bit)"
+    Since: "vSphere API 5.5"
+- sles12Guest:
+    DescName: "Suse linux Enterprise Server 12"
+    Since: "vSphere API 5.5"
+- sles15_64Guest:
+    DescName: "Suse Linux Enterprise Server 15 (64 bit)"
+    Since: "vSphere API 6.7"
+- sles64Guest:
+    DescName: "Suse Linux Enterprise Server 9 (64 bit)"
+    Since: ""
+- slesGuest:
+    DescName: "Suse Linux Enterprise Server 9"
+    Since: ""
+- solaris10_64Guest:
+    DescName: "Solaris 10 (64 bit) (experimental)"
+    Since: ""
+- solaris10Guest:
+    DescName: "Solaris 10 (32 bit) (experimental)"
+    Since: ""
+- solaris11_64Guest:
+    DescName: "Solaris 11 (64 bit)"
+    Since: "vSphere API 5.0"
+- solaris6Guest:
+    DescName: "Solaris 6"
+    Since: ""
+- solaris7Guest:
+    DescName: "Solaris 7"
+    Since: ""
+- solaris8Guest:
+    DescName: "Solaris 8"
+    Since: ""
+- solaris9Guest:
+    DescName: "Solaris 9"
+    Since: ""
+- suse64Guest:
+    DescName: "Suse Linux (64 bit)"
+    Since: ""
+- suseGuest:
+    DescName: "Suse Linux"
+    Since: ""
+- turboLinux64Guest:
+    DescName: "Turbolinux (64 bit)"
+    Since: "vSphere API 4.0"
+- turboLinuxGuest:
+    DescName: Turbolinux
+    Since: ""
+- ubuntu64Guest:
+    DescName: "Ubuntu Linux (64 bit)"
+    Since: ""
+- ubuntuGuest:
+    DescName: "Ubuntu Linux"
+    Since: ""
+- unixWare7Guest:
+    DescName: "SCO UnixWare 7"
+    Since: "vSphere API 4.0"
+- vmkernel5Guest:
+    DescName: "VMware ESX 5"
+    Since: "vSphere API 5.0"
+- vmkernel65Guest:
+    DescName: "VMware ESX 6.5"
+    Since: "vSphere API 6.5"
+- vmkernel6Guest:
+    DescName: "VMware ESX 6"
+    Since: "vSphere API 6.0"
+- vmkernelGuest:
+    DescName: "VMware ESX 4"
+    Since: "vSphere API 5.0"
+- vmwarePhoton64Guest:
+    DescName: "VMware Photon (64 bit)"
+    Since: "vSphere API 6.5"
+- win2000AdvServGuest:
+    DescName: "Windows 2000 Advanced Server"
+    Since: ""
+- win2000ProGuest:
+    DescName: "Windows 2000 Professional"
+    Since: ""
+- win2000ServGuest:
+    DescName: "Windows 2000 Server"
+    Since: ""
+- win31Guest:
+    DescName: "Windows 3.1"
+    Since: ""
+- win95Guest:
+    DescName: "Windows 95"
+    Since: ""
+- win98Guest:
+    DescName: "Windows 98"
+    Since: ""
+- windows7_64Guest:
+    DescName: "Windows 7 (64 bit)"
+    Since: "vSphere API 4.0"
+- windows7Guest:
+    DescName: "Windows 7"
+    Since: "vSphere API 4.0"
+- windows7Server64Guest:
+    DescName: "Windows Server 2008 R2 (64 bit)"
+    Since: "vSphere API 4.0"
+- windows8_64Guest:
+    DescName: "Windows 8 (64 bit)"
+    Since: "vSphere API 5.0"
+- windows8Guest:
+    DescName: "Windows 8"
+    Since: "vSphere API 5.0"
+- windows8Server64Guest:
+    DescName: "Windows 8 Server (64 bit)"
+    Since: "vSphere API 5.0"
+- windows9_64Guest:
+    DescName: "Windows 10 (64 bit)"
+    Since: "vSphere API 6.0"
+- windows9Guest:
+    DescName: "Windows 10"
+    Since: "vSphere API 6.0"
+- windows9Server64Guest:
+    DescName: "Windows 10 Server (64 bit)"
+    Since: "vSphere API 6.0"
+- windowsHyperVGuest:
+    DescName: "Windows Hyper-V"
+    Since: "vSphere API 5.5"
+- winLonghorn64Guest:
+    DescName: "Windows Longhorn (64 bit) (experimental)"
+    Since: "VI API 2.5"
+- winLonghornGuest:
+    DescName: "Windows Longhorn (experimental)"
+    Since: "VI API 2.5"
+- winMeGuest:
+    DescName: "Windows Millenium Edition"
+    Since: ""
+- winNetBusinessGuest:
+    DescName: "Windows Small Business Server 2003"
+    Since: ""
+- winNetDatacenter64Guest:
+    DescName: "Windows Server 2003, Datacenter Edition(64 bit)(experimental)"
+    Since: "VI API 2.5"
+- winNetDatacenterGuest:
+    DescName: "Windows Server 2003, Datacenter Edition"
+    Since: "VI API 2.5"
+- winNetEnterprise64Guest:
+    DescName: "Windows Server 2003, Enterprise Edition (64 bit)"
+    Since: ""
+- winNetEnterpriseGuest:
+    DescName: "Windows Server 2003, Enterprise Edition"
+    Since: ""
+- winNetStandard64Guest:
+    DescName: "Windows Server 2003, Standard Edition (64 bit)"
+    Since: ""
+- winNetStandardGuest:
+    DescName: "Windows Server 2003, Standard Edition"
+    Since: ""
+- winNetWebGuest:
+    DescName: "Windows Server 2003, Web Edition"
+    Since: ""
+- winNTGuest:
+    DescName: "Windows NT 4"
+    Since: ""
+- winVista64Guest:
+    DescName: "Windows Vista (64 bit)"
+    Since: ""
+- winVistaGuest:
+    DescName: "Windows Vista"
+    Since: ""
+- winXPHomeGuest:
+    DescName: "Windows XP Home Edition"
+    Since: ""
+- winXPPro64Guest:
+    DescName: "Windows XP Professional Edition (64 bit)"
+    Since: ""
+- winXPProGuest:
+    DescName: "Windows XP Professional"
+    Since: ""
