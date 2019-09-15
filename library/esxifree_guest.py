@@ -33,7 +33,7 @@ options:
       is removed with its associated components.'
     default: present
     choices: [ present, absent ]
-  name:
+  vm_name:
     description:
     - Name of the virtual machine to work with.
     - This parameter is required, if C(state) is set to C(poweredon), C(poweredoff), C(present), C(restarted), C(suspended)
@@ -43,7 +43,7 @@ options:
   vmid:
     description:
     - vmid of the virtual machine to manage if known, this is VMware's unique identifier.
-    - This is required if C(name) is not supplied.
+    - This is required if C(vm_name) is not supplied.
     - If virtual machine does not exists, then this parameter is ignored.
     - Will be ignored on virtual machine creation
   template:
@@ -98,19 +98,19 @@ options:
     - 'Valid attributes are:'
     - ' - C(type) (string): The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.'
     - ' - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).'
-  hostname:
+  esxi_hostname:
     description:
-    - The hostname or IP address of the ESXi server.
-  username:
+    - The esxi_hostname or IP address of the ESXi server.
+  esxi_username:
     description:
-    - The username to access the ESXi server.
-  password:
+    - The esxi_username to access the ESXi server.
+  esxi_password:
     description:
-    - The password of username for the ESXi server, or the password for the private key (if required).
-  pkeyfile:
+    - The esxi_password of esxi_username for the ESXi server, or the esxi_password for the private key (if required).
+  esxi_pkeyfile:
     description:
     - The private key file for the user of the ESXi server.
-  pkeystr:
+  esxi_pkeystr:
     description:
     - The private key (as a string) for the user of the ESXi server.
   force:
@@ -141,11 +141,11 @@ extends_documentation_fragment: vmware.documentation
 EXAMPLES = r'''
 - name: Create a blank virtual machine
   esxifree_guest:
-    hostname: "{{ esxi_ip }}"
-    username: "{{ esxi_username }}"
-    pkeyfile: "{{ esxi_pkey_file }}"
+    esxi_hostname: "{{ esxi_ip }}"
+    esxi_username: "{{ esxi_username }}"
+    esxi_pkeyfile: "{{ esxi_pkey_file }}"
     datastore: "/vmfs/volumes/sata-raid10-4tb-01/"
-    name: test_vm_0001
+    vm_name: test_vm_0001
     state: poweredon
     guest_id: ubuntu-64
     cdrom:
@@ -157,6 +157,20 @@ EXAMPLES = r'''
     networks:
     - networkName: VM Network
       virtualDev: vmxnet3
+      cloudinit:
+        version: 2
+        ethernets:
+          eth0:
+            addresses:
+            - 192.168.1.6/25
+            dhcp4: false
+            gateway4: 192.168.1.1
+            nameservers:
+              addresses:
+              - 8.8.8.8
+              - 8.8.4.4
+              search:
+              - local.dougalseeley.com
     hardware:
       memory_mb: 2048
       num_cpus: 2
@@ -165,21 +179,21 @@ EXAMPLES = r'''
 
 - name: Clone a virtual machine
   esxifree_guest:
-    hostname: "{{ esxi_ip }}"
-    username: "{{ esxi_username }}"
-    pkeystr: "{{ esxi_pkey_nopw }}"
+    esxi_hostname: "{{ esxi_ip }}"
+    esxi_username: "{{ esxi_username }}"
+    esxi_pkeystr: "{{ esxi_pkey_nopw }}"
     datastore: "/vmfs/volumes/sata-raid10-4tb-01/"
-    name: test_vm_0001
+    vm_name: test_vm_0001
     state: poweredon
     template: "centos7-template"
   delegate_to: localhost
 
 - name: Delete a virtual machine
   esxifree_guest:
-    hostname: "{{ esxi_ip }}"
-    username: "{{ esxi_username }}"
-    password: "{{ esxi_password }}"
-    name: test_vm_0001
+    esxi_hostname: "{{ esxi_ip }}"
+    esxi_username: "{{ esxi_username }}"
+    esxi_password: "{{ esxi_password }}"
+    vm_name: test_vm_0001
     state: absent
   delegate_to: localhost
 '''
@@ -201,6 +215,8 @@ import paramiko
 import sys
 import os
 import io
+import base64
+import yaml
 
 # paramiko.util.log_to_file("paramiko.log")
 
@@ -269,7 +285,7 @@ class SSHCmdExec(object):
         # print("Command is: {0}".format(command_string))
 
         (stdin, stdout, stderr) = self.remote_conn_client.exec_command(command_string)
-        if stdout.channel.recv_exit_status() != 0: # Blocking call
+        if stdout.channel.recv_exit_status() != 0:  # Blocking call
             raise IOError(stderr.read())
 
         return stdin, stdout, stderr
@@ -303,8 +319,8 @@ class esxiFreeScraper(object):
     vmx_skeleton['scsi0.virtualDev'] = "pvscsi"
     vmx_skeleton['scsi0.present'] = "TRUE"
 
-    def __init__(self, hostname, username='root', password=None, pkeyfile=None, pkeystr=None, vmName=None, vmId=None):
-        self.esxiCnx = SSHCmdExec(hostname=hostname, username=username, pkeyfile=pkeyfile, pkeystr=pkeystr, password=password)
+    def __init__(self, esxi_hostname, esxi_username='root', esxi_password=None, esxi_pkeyfile=None, esxi_pkeystr=None, vmName=None, vmId=None):
+        self.esxiCnx = SSHCmdExec(hostname=esxi_hostname, username=esxi_username, pkeyfile=esxi_pkeyfile, pkeystr=esxi_pkeystr, password=esxi_password)
         self.vmName, self.vmId = self.get_vm(vmName, vmId)
         if self.vmId is None:
             self.vmName = vmName
@@ -413,11 +429,21 @@ class esxiFreeScraper(object):
                 vmxDict.update({"ide0:0.startconnected": "TRUE"})
 
         # Network settings
+
+        cloudinit_nets = {"version": 2, "ethernets": {}}
         for netCount in range(0, len(networks)):
             vmxDict.update({"ethernet" + str(netCount) + ".virtualdev": networks[netCount]['virtualDev']})
             vmxDict.update({"ethernet" + str(netCount) + ".networkname": networks[netCount]['networkName']})
             vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
             vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
+            if "cloudinit" in networks[netCount]:
+                cloudinit_nets.update({"ethernets": networks[netCount]['cloudinit']})
+
+        # Add cloud-init (hostname & network)
+        cloudinit_metadata = {"local-hostname": self.vmName}
+        if cloudinit_nets['ethernets'].keys():
+            cloudinit_metadata.update({"network": base64.b64encode(yaml.dump(cloudinit_nets).encode('utf-8')).decode('ascii'), "network.encoding": "base64"})
+        vmxDict.update({"guestinfo.metadata": base64.b64encode((str(cloudinit_metadata)).encode('utf-8')).decode('ascii'), "guestinfo.metadata.encoding": "base64"})
 
         # Disk settings
         for diskCount in range(0, len(disks)):
@@ -446,12 +472,12 @@ class esxiFreeScraper(object):
 
 def main():
     argument_spec = {
-        "hostname": {"type": "str"},
-        "username": {"type": "str"},
-        "password": {"type": "str", "required": False},
-        "pkeyfile": {"type": "str", "required": False},
-        "pkeystr": {"type": "str", "required": False},
-        "name": {"type": "str", "required": False},
+        "esxi_hostname": {"type": "str"},
+        "esxi_username": {"type": "str"},
+        "esxi_password": {"type": "str", "required": False},
+        "esxi_pkeyfile": {"type": "str", "required": False},
+        "esxi_pkeystr": {"type": "str", "required": False},
+        "vm_name": {"type": "str", "required": False},
         "vmid": {"type": "str", "required": False},
         "state": {"type": "str", "default": 'present', "choices": ['absent', 'present']},
         "force": {"type": "bool", "default": False, "required": False},
@@ -469,17 +495,17 @@ def main():
 
     # For testing on Windows without Ansible
     if os.name != 'nt':
-        module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True, required_one_of=[['name', 'vmid'], ['password', 'pkeyfile', 'pkeystr']])
+        module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True, required_one_of=[['vm_name', 'vmid'], ['esxi_password', 'esxi_pkeyfile', 'esxi_pkeystr']])
     else:
         class cDummyAnsibleModule():
             ## Create blank VM
             # params = {
-            #     "hostname": "192.168.1.3",
-            #     "username": "root",
-            #     "pkeyfile": "../id_rsa_esxisvc_nopw",
-            #     "pkeystr": None,
-            #     "password": None,
-            #     "name": "dstest1",
+            #     "esxi_hostname": "192.168.1.3",
+            #     "esxi_username": "root",
+            #     "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
+            #     "esxi_pkeystr": None,
+            #     "esxi_password": None,
+            #     "vm_name": "dstest1",
             #     "state": "present",
             #     "guest_id": "centos7-64",
             #     "template": "",
@@ -496,12 +522,12 @@ def main():
 
             ## Clone VM
             params = {
-                "hostname": "192.168.1.3",
-                "username": "root",
-                "password": None,
-                "pkeyfile": "../id_rsa_esxisvc_nopw",
-                "pkeystr": None,
-                "name": "dstest1",
+                "esxi_hostname": "192.168.1.3",
+                "esxi_username": "root",
+                "esxi_password": None,
+                "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
+                "esxi_pkeystr": None,
+                "vm_name": "dstest1",
                 "state": "present",
                 "force": True,
                 "guest_id": "",
@@ -510,7 +536,8 @@ def main():
                 "hardware": {},
                 "disk": [],
                 "cdrom": {"type": "client"},
-                "networks": [],
+                "networks": [{"networkName": "THECROFT", "virtualDev": "vmxnet3", "cloudinit": {"eth0": {"dhcp4": True}}}],
+                # "networks": [{"networkName": "THECROFT", "virtualDev": "vmxnet3", "cloudinit": {"eth0": {"dhcp4": False, "addresses": ["192.168.1.16/25"], "gateway4": "192.168.1.1", "nameservers": {"search": ["local.dougalseeley.com"], "addresses": ["192.168.1.2", "8.8.8.8", "8.8.4.4"]}}}}],
                 "customvalues": [],
                 "vmId": None,
                 "wait": True,
@@ -519,12 +546,12 @@ def main():
 
             ## Delete VM
             # params = {
-            #     "hostname": "192.168.1.3",
-            #     "username": "root",
-            #     "password": None,
-            #     "pkeyfile": "../id_rsa_esxisvc_nopw",
-            #     "pkeystr": None,
-            #     "name": "dstest1",
+            #     "esxi_hostname": "192.168.1.3",
+            #     "esxi_username": "root",
+            #     "esxi_password": None,
+            #     "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
+            #     "esxi_pkeystr": None,
+            #     "vm_name": "dstest1",
             #     "state": "absent",
             #     "vmId": None,
             #     "wait": None,
@@ -540,12 +567,12 @@ def main():
 
         module = cDummyAnsibleModule()
 
-    pyv = esxiFreeScraper(hostname=module.params['hostname'],
-                          username=module.params['username'],
-                          password=module.params['password'],
-                          pkeyfile=module.params['pkeyfile'],
-                          pkeystr=module.params['pkeystr'],
-                          vmName=module.params['name'],
+    pyv = esxiFreeScraper(esxi_hostname=module.params['esxi_hostname'],
+                          esxi_username=module.params['esxi_username'],
+                          esxi_password=module.params['esxi_password'],
+                          esxi_pkeyfile=module.params['esxi_pkeyfile'],
+                          esxi_pkeystr=module.params['esxi_pkeystr'],
+                          vmName=module.params['vm_name'],
                           vmId=module.params['vmId'])
 
     if pyv.vmId is None and pyv.vmName is None:
@@ -589,14 +616,14 @@ def main():
             module.exit_json(changed=True,
                              hostname=vm_params.group('hostname'),
                              ipAddress=vm_params.group('ip'),
-                             vmName=module.params['name'],
+                             vmName=module.params['vm_name'],
                              vmID=pyv.vmId)
 
         else:
             module.exit_json(changed=True,
                              hostname="",
                              ipAddress="",
-                             vmName=module.params['name'],
+                             vmName=module.params['vm_name'],
                              vmID=pyv.vmId)
 
 
