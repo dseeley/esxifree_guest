@@ -157,6 +157,7 @@ EXAMPLES = r'''
     networks:
     - networkName: VM Network
       virtualDev: vmxnet3
+      macAddress: "00:0c:29:f2:dc:da"
       cloudinit:
         version: 2
         ethernets:
@@ -219,6 +220,7 @@ import base64
 import yaml
 
 # paramiko.util.log_to_file("paramiko.log")
+# paramiko.common.logging.basicConfig(level=paramiko.common.DEBUG)
 
 try:
     from ansible.module_utils.basic import AnsibleModule
@@ -269,7 +271,7 @@ class SSHCmdExec(object):
             print("Connection timed-out to " + hostname)  # + "\n\n" + str(sock_err)
             exit(1)
         except paramiko.ssh_exception.AuthenticationException as auth_err:
-            print("Authentication failure, unable to connect to " + hostname + " as " + username)  # + "\n\n" + str(auth_err)
+            print("Authentication failure, unable to connect to " + hostname + " as " + username + "\n\n" + str(auth_err) + "\n\n" + str(sys.exc_info()[0]))  # + str(auth_err))
             exit(1)
         except:
             print("Unexpected error: ", sys.exc_info()[0])
@@ -435,7 +437,12 @@ class esxiFreeScraper(object):
         for netCount in range(0, len(networks)):
             vmxDict.update({"ethernet" + str(netCount) + ".virtualdev": networks[netCount]['virtualDev']})
             vmxDict.update({"ethernet" + str(netCount) + ".networkname": networks[netCount]['networkName']})
-            vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
+            if "macAddress" in networks[netCount]:
+                vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "static"})
+                vmxDict.update({"ethernet" + str(netCount) + ".address": networks[netCount]['macAddress']})
+                vmxDict.update({"ethernet" + str(netCount) + ".checkmacaddress": "FALSE"})
+            else:
+                vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
             vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
             if "cloudinit" in networks[netCount]:
                 cloudinit_nets.update({"ethernets": networks[netCount]['cloudinit']})
@@ -511,7 +518,7 @@ def main():
     }
 
     # For testing on Windows without Ansible
-    if os.name != 'nt':
+    if os.name != 'nt' and (len(sys.argv) > 1 and sys.argv[1] != "console"):
         module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True, required_one_of=[['vm_name', 'vm_id'], ['esxi_password', 'esxi_pkeyfile', 'esxi_pkeystr']])
     else:
         class cDummyAnsibleModule():
@@ -539,8 +546,8 @@ def main():
 
             ## Clone VM
             params = {
-                "esxi_hostname": "192.168.1.3",
-                "esxi_username": "root",
+                "esxi_hostname": "10.189.132.4",
+                "esxi_username": "svc",
                 "esxi_password": None,
                 "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
                 "esxi_pkeystr": None,
@@ -550,12 +557,12 @@ def main():
                 "state": "present",
                 "force": True,
                 "guest_id": "",
-                "datastore_path": "/vmfs/volumes/sata-raid10-4tb-01/",
+                "datastore_path": "/vmfs/volumes/datastore1/",
                 "hardware": {},
                 "disk": [],
                 "cdrom": {"type": "client"},
-                # "networks": [{"networkName": "THECROFT", "virtualDev": "vmxnet3", "cloudinit": {"eth0": {"dhcp4": True}}}],
-                "networks": [{"networkName": "THECROFT", "virtualDev": "vmxnet3", "cloudinit": {"eth0": {"dhcp4": False, "addresses": ["192.168.1.6/25"], "gateway4": "192.168.1.1", "nameservers": {"search": ["local.dougalseeley.com"], "addresses": ["192.168.1.2", "8.8.8.8", "8.8.4.4"]}}}}],
+                "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit": {"eth0": {"dhcp4": True}}}],
+                # "networks": [{"networkName": "THECROFT", "virtualDev": "vmxnet3", "macAddress": "00:0c:29:f2:dc:da", "cloudinit": {"eth0": {"dhcp4": False, "addresses": ["192.168.1.6/25"], "gateway4": "192.168.1.1", "nameservers": {"search": ["local.dougalseeley.com"], "addresses": ["192.168.1.2", "8.8.8.8", "8.8.4.4"]}}}}],
                 "customvalues": [],
                 "wait": True,
                 "wait_timeout": 300
@@ -585,12 +592,12 @@ def main():
         module = cDummyAnsibleModule()
 
     iScraper = esxiFreeScraper(esxi_hostname=module.params['esxi_hostname'],
-                          esxi_username=module.params['esxi_username'],
-                          esxi_password=module.params['esxi_password'],
-                          esxi_pkeyfile=module.params['esxi_pkeyfile'],
-                          esxi_pkeystr=module.params['esxi_pkeystr'],
-                          vm_name=module.params['vm_name'],
-                          vm_id=module.params['vm_id'])
+                               esxi_username=module.params['esxi_username'],
+                               esxi_password=module.params['esxi_password'],
+                               esxi_pkeyfile=module.params['esxi_pkeyfile'],
+                               esxi_pkeystr=module.params['esxi_pkeystr'],
+                               vm_name=module.params['vm_name'],
+                               vm_id=module.params['vm_id'])
 
     if iScraper.vm_id is None and iScraper.vm_name is None:
         module.fail_json(msg="If VM doesn't already exist, you must provide a name for it")
@@ -633,6 +640,7 @@ def main():
                     time_s = time_s - 1
 
             module.exit_json(changed=True,
+                             guest_info=guest_info,
                              hostname=vm_params.group('vm_hostname'),
                              ip_address=vm_params.group('vm_ip'),
                              vm_name=module.params['vm_name'],
