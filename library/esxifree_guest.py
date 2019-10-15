@@ -24,80 +24,6 @@ requirements:
 notes:
     - Please make sure the user used for esxifree_guest should have correct level of privileges.
 options:
-  state:
-    description:
-    - Specify state of the virtual machine be in.
-    - 'If C(state) is set to C(present) and virtual machine exists, ensure the virtual machine
-       configurations conforms to task arguments.'
-    - 'If C(state) is set to C(absent) and virtual machine exists, then the specified virtual machine
-      is removed with its associated components.'
-    default: present
-    choices: [ present, absent ]
-  vm_name:
-    description:
-    - Name of the virtual machine to work with.
-    - This parameter is required, if C(state) is set to C(poweredon), C(poweredoff), C(present), C(restarted), C(suspended)
-      and virtual machine does not exists.
-    - This parameter is case sensitive.
-    required: yes
-  vm_id:
-    description:
-    - vm id of the virtual machine to manage if known, this is VMware's unique identifier.
-    - This is required if C(vm_name) is not supplied.
-    - If virtual machine does not exists, then this parameter is ignored.
-    - Will be ignored on virtual machine creation
-  vm_template:
-    description:
-    - Template or existing virtual machine used to create new virtual machine.
-    - If this value is not set, virtual machine is created without using a template.
-    - If the virtual machine already exists, this parameter will be ignored.
-    - This parameter is case sensitive.
-  datastore_path:
-    description:
-    - Destination datastore, absolute path to create the new guest.
-    - This parameter is case sensitive.
-    - This parameter is required, while deploying new virtual machine.
-    - 'Examples:'
-    - '   datastore_path: /vmfs/volumes/sata-raid10-4tb-01/'
-    - '   datastore_path: /vmfs/volumes/datastore1/'
-  hardware:
-    description:
-    - Manage virtual machine's hardware attributes.
-    - All parameters case sensitive.
-    - 'Valid attributes are:'
-    - ' - C(memory_mb) (integer): Amount of memory in MB.'
-    - ' - C(num_cpus) (integer): Number of CPUs.'
-    - ' - C(version) (integer): The Virtual machine hardware versions. Default is 14 (ESXi 6.7 and onwards).
-  guest_id:
-    description:
-    - Set the guest ID.
-    - This parameter is case sensitive.
-    - 'Examples:'
-    - "  virtual machine with RHEL7 64 bit, will be 'rhel7-64'"
-    - "  virtual machine with CentOS 7 (64-bit), will be 'centos7-64'"
-    - "  virtual machine with Debian 9 (Stretch) 64 bit, will be 'debian9-64'"
-    - "  virtual machine with Ubuntu 64 bit, will be 'ubuntu-64'"
-    - "  virtual machine with Windows 10 (64 bit), will be 'windows9-64'"
-    - "  virtual machine with Other (64 bit), will be 'other-64'"
-    - This field is required when creating a virtual machine.
-  disk:
-    description:
-    - A list of disks to add.
-    - This parameter is case sensitive.
-    - Resizing disks is not supported.
-    - Removing existing disks of the virtual machine is not supported.
-    - 'Valid attributes are:'
-    - ' - C(size_gb) (integer): Disk storage size in GB'
-    - ' - C(type) (string): Valid values are:'
-    - '     - C(thin) thin disk'
-    - '     - C(eagerzeroedthick) eagerzeroedthick disk, added in version 2.5'
-    - '     Default: C(None) thick disk, no eagerzero.'
-  cdrom:
-    description:
-    - A CD-ROM configuration for the virtual machine.
-    - 'Valid attributes are:'
-    - ' - C(type) (string): The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.'
-    - ' - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).'
   esxi_hostname:
     description:
     - The esxi_hostname or IP address of the ESXi server.
@@ -113,9 +39,84 @@ options:
   esxi_pkeystr:
     description:
     - The private key (as a string) for the user of the ESXi server.
+  vm_name:
+    description:
+    - Name of the virtual machine to work with.
+    - This parameter is required, if C(state) is set to C(poweredon), C(poweredoff), C(present), C(restarted), C(suspended) and virtual machine does not exists.
+    - This parameter is case sensitive.
+    required: yes
+  vm_id:
+    description:
+    - vm id of the virtual machine to manage if known, this is VMware's unique identifier.
+    - This is required if C(vm_name) is not supplied.
+    - If virtual machine does not exists, then this parameter is ignored.
+    - Will be ignored on virtual machine creation
+  vm_template:
+    description:
+    - Template or existing virtual machine used to create new virtual machine.
+    - If this value is not set, virtual machine is created without using a template.
+    - If the virtual machine already exists, this parameter will be ignored.
+    - This parameter is case sensitive.
+  state:
+    description:
+    - Specify state of the virtual machine be in.
+    - 'If C(state) is set to C(present) and virtual machine exists, ensure the virtual machine configurations conforms to task arguments.'
+    - 'If C(state) is set to C(absent) and virtual machine exists, then the specified virtual machine is removed with its associated components.'
+    default: present
+    choices: [ present, absent ]
   force:
     description:
     - Delete the existing host if it exists.
+  datastore_path:
+    description:
+    - Destination datastore, absolute path to create the new guest.
+    - This parameter is case sensitive.
+    - This parameter is required, while deploying new virtual machine.
+    - 'Examples:'
+    - '   datastore_path: /vmfs/volumes/sata-raid10-4tb-01/'
+    - '   datastore_path: /vmfs/volumes/datastore1/'
+  guest_id:
+    description:
+    - Set the guest ID.
+    - This parameter is case sensitive.
+    - 'Examples:'
+    - "  virtual machine with RHEL7 64 bit, will be 'rhel7-64'"
+    - "  virtual machine with CentOS 7 (64-bit), will be 'centos7-64'"
+    - "  virtual machine with Debian 9 (Stretch) 64 bit, will be 'debian9-64'"
+    - "  virtual machine with Ubuntu 64 bit, will be 'ubuntu-64'"
+    - "  virtual machine with Windows 10 (64 bit), will be 'windows9-64'"
+    - "  virtual machine with Other (64 bit), will be 'other-64'"
+    - This field is required when creating a virtual machine.
+  hardware:
+    description:
+    - Manage virtual machine's hardware attributes.
+    - All parameters case sensitive.
+    - 'Valid attributes are:'
+    - ' - C(memory_mb) (integer): Amount of memory in MB.'
+    - ' - C(num_cpus) (integer): Number of CPUs.'
+    - ' - C(version) (integer): The Virtual machine hardware versions. Default is 14 (ESXi 6.7 and onwards).
+  cloudinit_userdata:
+    description:
+    - cloud-init userdata
+  disks:
+    description:
+    - This parameter is case sensitive.
+    - Resizing disks is not supported.
+    - Removing existing disks of the virtual machine is not supported.
+    - Array of disks.
+    - 'Valid attributes are:'
+    - ' - C(size_gb) (integer): Disk storage size in GB'
+    - ' - C(type) (string): Valid values are:'
+    - '     - C(thin) thin disk'
+    - '     - C(thick) no eagerzero'
+    - '     - C(eagerzeroedthick) eagerzeroedthick disk, added in version 2.5'
+    - '     Default: C(thin)'
+  cdrom:
+    description:
+    - A CD-ROM configuration for the virtual machine.
+    - 'Valid attributes are:'
+    - ' - C(type) (string): The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.'
+    - ' - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).'
   networks:
     description:
     - A list of networks (in the order of the NICs).
@@ -139,54 +140,77 @@ options:
 extends_documentation_fragment: vmware.documentation
 '''
 EXAMPLES = r'''
-- name: Create a blank virtual machine
+- name: Create vmware instances
   esxifree_guest:
-    esxi_hostname: "{{ esxi_ip }}"
-    esxi_username: "{{ esxi_username }}"
-    esxi_pkeyfile: "{{ esxi_pkey_file }}"
+    esxi_hostname: "192.168.1.3"
+    esxi_username: "svc"
+    esxi_pkeystr: "{{ esxi_pkeystr }}"
     datastore_path: "/vmfs/volumes/sata-raid10-4tb-01/"
-    vm_name: test_vm_0001
-    state: poweredon
+    vm_name: "test_asdf"
+    state: present
     guest_id: ubuntu-64
-    cdrom:
-      type: iso
-      iso_path: "/vmfs/volumes/sata-raid10-4tb-01/ISOs/ubuntu-18.04.1.0-live-server-amd64.iso"
-    disk:
-    - size_gb: 16
-      type: thin
+    hardware: {"version": "14", "num_cpus": "2", "memory_mb": "2048"}
+    cloudinit_userdata:
+      - default
+      - name: dougal
+        primary_group: dougal
+        sudo: "ALL=(ALL) NOPASSWD:ALL"
+        groups: "sudo, wheel"
+        ssh_import_id: None
+        lock_passwd: true
+        ssh_authorized_keys: ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACA+.................GIMhdojtl6mzVn38vXMzSL29LQ== ansible@dougalseeley.com']
+    disks:
+      root: {"size_gb": 16, "type": "thin"}
+      mnt_copy: False,
+      mnt_new: [{"size_gb": 50, "type": "thin"}]
     networks:
-    - networkName: VM Network
-      virtualDev: vmxnet3
-      macAddress: "00:0c:29:f2:dc:da"
-      cloudinit:
-        version: 2
-        ethernets:
+      - networkName: VM Network
+        virtualDev: vmxnet3
+        cloudinit_ethernets:
           eth0:
-            addresses:
-            - 192.168.1.6/25
+            addresses: ["192.168.1.8/25"]
             dhcp4: false
             gateway4: 192.168.1.1
             nameservers:
-              addresses:
-              - 8.8.8.8
-              - 8.8.4.4
-              search:
-              - local.dougalseeley.com
-    hardware:
-      memory_mb: 2048
-      num_cpus: 2
-      version: 14
+              addresses: ["192.168.1.2", "8.8.8.8", "8.8.4.4"]
+              search: ["local.dougalseeley.com"]
   delegate_to: localhost
 
 - name: Clone a virtual machine
   esxifree_guest:
-    esxi_hostname: "{{ esxi_ip }}"
-    esxi_username: "{{ esxi_username }}"
-    esxi_pkeystr: "{{ esxi_pkey_nopw }}"
+    esxi_hostname: "192.168.1.3"
+    esxi_username: "svc"
+    esxi_pkeystr: "{{ esxi_pkeystr }}"
     datastore_path: "/vmfs/volumes/sata-raid10-4tb-01/"
-    vm_name: test_vm_0001
-    state: poweredon
-    vm_template: "centos7-template"
+    vm_template: "ubuntu1804-packer-template"
+    vm_name: "test_asdf"
+    state: present
+    guest_id: ubuntu-64
+    hardware: {"version": "14", "num_cpus": "2", "memory_mb": "2048"}
+    cloudinit_userdata:
+      - default
+      - name: dougal
+        primary_group: dougal
+        sudo: "ALL=(ALL) NOPASSWD:ALL"
+        groups: "sudo, wheel"
+        ssh_import_id: None
+        lock_passwd: true
+        ssh_authorized_keys: ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACA+.................GIMhdojtl6mzVn38vXMzSL29LQ== ansible@dougalseeley.com']
+    disks:
+      root: {}
+      mnt_copy: False,
+      mnt_new: [{"size_gb": 25, "type": "thin"}]
+    networks:
+      - networkName: VM Network
+        virtualDev: vmxnet3
+        cloudinit_ethernets:
+          eth0:
+            addresses: ["192.168.1.8/25"]
+            dhcp4: false
+            gateway4: 192.168.1.1
+            nameservers:
+              addresses: ["192.168.1.2", "8.8.8.8", "8.8.4.4"]
+              search: ["local.dougalseeley.com"]
   delegate_to: localhost
 
 - name: Delete a virtual machine
@@ -234,9 +258,9 @@ class SSHCmdExec(object):
         self.hostname = hostname
 
         try:
-            if pkeystr:
+            if pkeystr and pkeystr != "":
                 pkey_fromstr = paramiko.RSAKey.from_private_key(io.StringIO(pkeystr), password)
-            if pkeyfile:
+            if pkeyfile and pkeyfile != "":
                 pkey_fromfile = paramiko.RSAKey.from_private_key_file(pkeyfile, password)
         except paramiko.ssh_exception.PasswordRequiredException as auth_err:
             print("Authentication failure, Password required" + "\n\n" + str(auth_err))
@@ -351,7 +375,7 @@ class esxiFreeScraper(object):
 
             return vmxPath, vmxFileDict
 
-    def create_vm(self, vmTemplate=None, datastore_path=None, hardware=None, guest_id=None, disks=None, cdrom=None, customvalues=None, networks=None):
+    def create_vm(self, vmTemplate=None, datastore_path=None, hardware=None, guest_id=None, disks=None, cdrom=None, customvalues=None, networks=None, cloudinit_userdata=None):
         # Create VM directory
         vmPath = datastore_path + "/" + self.vm_name
         self.esxiCnx.exec_command("mkdir -p " + vmPath)
@@ -360,6 +384,7 @@ class esxiFreeScraper(object):
 
         # First apply any vmx settings from the template.
         # These will be overridden by explicit configuration.
+        diskCount = 0
         if vmTemplate:
             templ_vmName, templ_vmId = self.get_vm(vmTemplate, None)
             if templ_vmId:
@@ -383,25 +408,38 @@ class esxiFreeScraper(object):
                     vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
                     netCount = netCount + 1
 
-                # Disk settings
-                diskCount = 0
-                while "scsi0:" + str(diskCount) + ".filename" in templ_vmxDict:
-                    # See if vmTemplate disk exists
-                    try:
-                        (stdin, stdout, stderr) = self.esxiCnx.exec_command("find " + datastore_path + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"])
-                    except IOError as e:
-                        pass
-                    else:
-                        disk_count_suffix = "_" + diskCount if diskCount > 0 else ""
-                        disk_filename = self.vm_name + disk_count_suffix + ".vmdk"
-                        self.esxiCnx.exec_command("vmkfstools -i " + datastore_path + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"] + " -d thin" + " " + vmPath + "/" + disk_filename)
+                ### Disk cloning
+                # Clone first (root) if present
+                try:
+                    (stdin, stdout, stderr) = self.esxiCnx.exec_command("find " + datastore_path + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:0.filename"])
+                except IOError as e:
+                    pass
+                else:
+                    disk_filename = self.vm_name + ".vmdk"
+                    self.esxiCnx.exec_command("vmkfstools -i " + datastore_path + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:0.filename"] + " -d thin" + " " + vmPath + "/" + disk_filename)
 
-                        vmxDict.update({"scsi0:" + str(diskCount) + ".devicetype": "scsi-hardDisk"})
-                        vmxDict.update({"scsi0:" + str(diskCount) + ".present": "TRUE"})
-                        vmxDict.update({"scsi0:" + str(diskCount) + ".filename": disk_filename})
-                        diskCount = diskCount + 1
+                    vmxDict.update({"scsi0:0.devicetype": "scsi-hardDisk"})
+                    vmxDict.update({"scsi0:0.present": "TRUE"})
+                    vmxDict.update({"scsi0:0.filename": disk_filename})
+                    diskCount = diskCount + 1
+                if "mnt_copy" in disks:
+                    while "scsi0:" + str(diskCount) + ".filename" in templ_vmxDict:
+                        # See if vmTemplate disk exists
+                        try:
+                            (stdin, stdout, stderr) = self.esxiCnx.exec_command("find " + datastore_path + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"])
+                        except IOError as e:
+                            pass
+                        else:
+                            diskIdxSuffix = "_" + str(diskCount) if diskCount > 0 else ""
+                            disk_filename = self.vm_name + diskIdxSuffix + ".vmdk"
+                            self.esxiCnx.exec_command("vmkfstools -i " + datastore_path + "/" + vmTemplate + "/" + templ_vmxDict["scsi0:" + str(diskCount) + ".filename"] + " -d thin" + " " + vmPath + "/" + disk_filename)
 
-        # Now add remaining settings, overriding template copies.
+                            vmxDict.update({"scsi0:" + str(diskCount) + ".devicetype": "scsi-hardDisk"})
+                            vmxDict.update({"scsi0:" + str(diskCount) + ".present": "TRUE"})
+                            vmxDict.update({"scsi0:" + str(diskCount) + ".filename": disk_filename})
+                            diskCount = diskCount + 1
+
+        ## Now add remaining settings, overriding template copies.
 
         # Generic settings
         if guest_id:
@@ -432,7 +470,6 @@ class esxiFreeScraper(object):
                 vmxDict.update({"ide0:0.startconnected": "TRUE"})
 
         # Network settings
-
         cloudinit_nets = {"version": 2, "ethernets": {}}
         for netCount in range(0, len(networks)):
             vmxDict.update({"ethernet" + str(netCount) + ".virtualdev": networks[netCount]['virtualDev']})
@@ -444,25 +481,45 @@ class esxiFreeScraper(object):
             else:
                 vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
             vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
-            if "cloudinit" in networks[netCount]:
-                cloudinit_nets.update({"ethernets": networks[netCount]['cloudinit']})
+            if "cloudinit_ethernets" in networks[netCount]:
+                cloudinit_nets.update({"ethernets": networks[netCount]['cloudinit_ethernets']})
 
-        # Add cloud-init (hostname & network)
+        # Add cloud-init metadata (hostname & network)
         cloudinit_metadata = {"local-hostname": self.vm_name}
         if cloudinit_nets['ethernets'].keys():
-            cloudinit_metadata.update({"network": base64.b64encode(yaml.dump(cloudinit_nets).encode('utf-8')).decode('ascii'), "network.encoding": "base64"})
+            cloudinit_metadata.update({"network": base64.b64encode(yaml.dump(cloudinit_nets, width=4096, encoding='utf-8')).decode('ascii'), "network.encoding": "base64"})
         vmxDict.update({"guestinfo.metadata": base64.b64encode((str(cloudinit_metadata)).encode('utf-8')).decode('ascii'), "guestinfo.metadata.encoding": "base64"})
 
+        # Add cloud-init userdata (must be in MIME multipart format)
+        if cloudinit_userdata and len(cloudinit_userdata):
+            import sys
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
+            combined_message = MIMEMultipart()
+            sub_message = MIMEText(yaml.dump({"users": cloudinit_userdata}, width=4096), "cloud-config", sys.getdefaultencoding())
+            sub_message.add_header('Content-Disposition', 'attachment; filename="cloud-config.yaml"')
+            combined_message.attach(sub_message)
+            vmxDict.update({"guestinfo.userdata": base64.b64encode(combined_message.as_bytes()).decode('ascii'), "guestinfo.userdata.encoding": "base64"})
+
         # Disk settings
-        for diskCount in range(0, len(disks)):
-            disk_count_suffix = "_" + diskCount if diskCount > 0 else ""
-            disk_filename = self.vm_name + disk_count_suffix + ".vmdk"
+        if "scsi0:0.filename" not in vmxDict:
+            disk_filename = self.vm_name + ".vmdk"
+            (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disks["root"]['size_gb']) + "G -d " + disks["root"]['type'] + " " + vmPath + "/" + disk_filename)
 
-            (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disks[diskCount]['size_gb']) + "G -d " + disks[diskCount]['type'] + " " + vmPath + "/" + disk_filename)
+            vmxDict.update({"scsi0:0.devicetype": "scsi-hardDisk"})
+            vmxDict.update({"scsi0:0.present": "TRUE"})
+            vmxDict.update({"scsi0:0.filename": disk_filename})
+            diskCount = diskCount + 1
+        if "mnt_new" in disks:
+            for newDiskIdx in range(len(disks["mnt_new"])):
+                vmxDict_diskIdx = newDiskIdx + diskCount
+                disk_filename = self.vm_name + "_" + str(vmxDict_diskIdx) + ".vmdk"
 
-            vmxDict.update({"scsi0:" + str(diskCount) + ".devicetype": "scsi-hardDisk"})
-            vmxDict.update({"scsi0:" + str(diskCount) + ".present": "TRUE"})
-            vmxDict.update({"scsi0:" + str(diskCount) + ".filename": disk_filename})
+                (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disks["mnt_new"][newDiskIdx]['size_gb']) + "G -d " + disks["mnt_new"][newDiskIdx]['type'] + " " + vmPath + "/" + disk_filename)
+
+                vmxDict.update({"scsi0:" + str(vmxDict_diskIdx) + ".devicetype": "scsi-hardDisk"})
+                vmxDict.update({"scsi0:" + str(vmxDict_diskIdx) + ".present": "TRUE"})
+                vmxDict.update({"scsi0:" + str(vmxDict_diskIdx) + ".filename": disk_filename})
 
         # Dump the VMX
         # print(json.dumps(vmxDict, sort_keys=True, indent=4, separators=(',', ': ')))
@@ -484,6 +541,10 @@ class esxiFreeScraper(object):
             del vmxDict['guestinfo.metadata']
         if 'guestinfo.metadata.encoding' in vmxDict:
             del vmxDict['guestinfo.metadata.encoding']
+        if 'guestinfo.userdata' in vmxDict:
+            del vmxDict['guestinfo.userdata']
+        if 'guestinfo.userdata.encoding' in vmxDict:
+            del vmxDict['guestinfo.userdata.encoding']
 
         # Dump the VMX
         vmxStr = io.StringIO()
@@ -496,90 +557,91 @@ class esxiFreeScraper(object):
 
 def main():
     argument_spec = {
-        "esxi_hostname": {"type": "str"},
-        "esxi_username": {"type": "str"},
-        "esxi_password": {"type": "str", "required": False},
-        "esxi_pkeyfile": {"type": "str", "required": False},
-        "esxi_pkeystr": {"type": "str", "required": False},
-        "vm_name": {"type": "str", "required": False},
-        "vm_id": {"type": "str", "required": False},
-        "vm_template": {"type": "str", "required": False},
+        "esxi_hostname": {"type": "str", "required": True},
+        "esxi_username": {"type": "str", "required": True},
+        "esxi_password": {"type": "str"},
+        "esxi_pkeyfile": {"type": "str"},
+        "esxi_pkeystr": {"type": "str"},
+        "vm_name": {"type": "str"},
+        "vm_id": {"type": "str"},
+        "vm_template": {"type": "str"},
         "state": {"type": "str", "default": 'present', "choices": ['absent', 'present']},
-        "force": {"type": "bool", "default": False, "required": False},
-        "datastore_path": {"type": "str", "required": True},
-        "hardware": {"type": "dict", "default": {}},
-        "guest_id": {"type": "str", "default": ""},
-        "disk": {"type": "list", "default": []},
+        "force": {"type": "bool", "default": False},
+        "datastore_path": {"type": "str"},
+        "guest_id": {"type": "str", "default": "ubuntu-64"},
+        "hardware": {"type": "dict", "default": {"version": "14", "num_cpus": "2", "memory_mb": "2048"}},
+        "cloudinit_userdata": {"type": "list", "default": []},
+        "disks": {"type": "dict", "default": {"root": {"size_gb": 16, "type": "thin"}, "mnt_copy": False, "mnt_new": [{"size_gb": 50, "type": "thin"}]}},
         "cdrom": {"type": "dict", "default": {"type": "client"}},
-        "networks": {"type": "list", "default": []},
+        "networks": {"type": "list", "default": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}]},
         "customvalues": {"type": "list", "default": []},
-        "wait": {"type": "bool", "default": True, "required": False},
-        "wait_timeout": {"type": "int", "default": 300, "required": False}
+        "wait": {"type": "bool", "default": True},
+        "wait_timeout": {"type": "int", "default": 180}
     }
 
-    # For testing on Windows without Ansible
-    if os.name != 'nt' and (len(sys.argv) > 1 and sys.argv[1] != "console"):
+    if not (os.name == 'nt' and (len(sys.argv) > 1 and sys.argv[1] == "console")):
         module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True, required_one_of=[['vm_name', 'vm_id'], ['esxi_password', 'esxi_pkeyfile', 'esxi_pkeystr']])
     else:
+        # For testing without Ansible (e.g on Windows)
         class cDummyAnsibleModule():
             ## Create blank VM
             # params = {
             #     "esxi_hostname": "192.168.1.3",
-            #     "esxi_username": "root",
+            #     "esxi_username": "svc",
             #     "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
             #     "esxi_pkeystr": None,
             #     "esxi_password": None,
-            #     "vm_name": "dstest1",
+            #     "vm_name": "test-asdf",
             #     "vm_id": None,
-            #     "vm_template": "",
+            #     "vm_template": None,
             #     "state": "present",
-            #     "guest_id": "centos7-64",
+            #     "force": False,
             #     "datastore_path": "/vmfs/volumes/sata-raid10-4tb-01/",
+            #     "guest_id": "ubuntu-64",
             #     "hardware": {"version": "14", "num_cpus": "2", "memory_mb": "2048"},
-            #     "disk": [{"size_gb": "16", "type": "thin"}],
-            #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/sata-raid10-4tb-01/ISOs/CentOS-7-x86_64-Minimal-1810.iso"},
+            #     "cloudinit_userdata": [],
+            #     "disks": {"root": {"size_gb": 16, "type": "thin"}, "mnt_copy": False, "mnt_new": [{"size_gb": 50, "type": "thin"}]},
+            #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/sata-raid10-4tb-01/ISOs/ubuntu-18.04.2-server-amd64.iso"},
             #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}],
             #     "customvalues": [],
-            #     "wait": None,
-            #     "wait_timeout": None
+            #     "wait": True,
+            #     "wait_timeout": 180,
             # }
 
             ## Clone VM
             params = {
-                "esxi_hostname": "10.189.132.4",
+                "esxi_hostname": "192.168.1.3",
                 "esxi_username": "svc",
                 "esxi_password": None,
                 "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
                 "esxi_pkeystr": None,
-                "vm_name": "dev",
+                "vm_name": "test-asdf",
                 "vm_id": None,
                 "vm_template": "ubuntu1804-packer-template",
                 "state": "present",
-                "force": True,
-                "guest_id": "",
-                "datastore_path": "/vmfs/volumes/datastore1/",
+                "force": False,
+                "datastore_path": "/vmfs/volumes/sata-raid10-4tb-01/",
+                "guest_id": "ubuntu-64",
                 "hardware": {},
-                "disk": [],
+                "cloudinit_userdata": [{"name": "dougal", "primary_group": "dougal", "sudo": "ALL=(ALL) NOPASSWD:ALL", "groups": "sudo, wheel", "ssh_authorized_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDkfG8dfDWl0SpWG8prAxPGXg8xbi1ipM8A2BGK+zTAIftN0qJCmHJqLb4o7wCkFrwfaRZ18/sTpZzn+pyL8dGroinwTCL5EymFT2xD5YLM9gcel8RMj77WnIEtjEGHGC3PFf2TQ4m4OAlkdnn4muMoN6OJ44kJOx4saXqYwNaO/IWFEwrF0+pGiZwutah/txgC7IR+q8HJQ4Uv+x/3v48TV7EPKfCM5wX4iMuSia3Q+32SzZI7gbKqDgBgCFKgaV7NSTcFkwc2C4yHuLsoVIC5ZaByeJQ4WlvJgHb3KaAutr0PjHww+BiD/SVz6GwSjEpOuQur9xWf/+gZrHCjPFZvsQa95blMsyHkig837Xh4i8PR8TCopn6ERVaLHL4JINSIFaLF9sHnfP6C5ZVkQLemO7j8I9AmINwK+hXfkWdHD8wBRHo0lQkGPNRwJhwDcGa4nD/wjimN+BN4VK3l9ODf/74WNuXwyLQHTkqanCjI6ZDRIe2mUeYaoU2DH3Hi+CpQFC/BeKMivnrEOrsIwV2tPzZ0LruoBMQNt99rAq3/+Rmw+fZwJiqjsidsaY/i0QP1LPc8US5Li7XyA7QwXO2csNYHKTkXEetJFoWai7OzZYALf/iI+5bysPtuBqlNnnyNEOxKvVQg81xFIE5/GIMhdojtl6mzVn38vXMzSL29LQ== dougal@dougalseeley.com"]}],
+                "disks": {"root": {"size_gb": 16, "type": "thin"}, "mnt_copy": False, "mnt_new": []},
                 "cdrom": {"type": "client"},
-                "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit": {"eth0": {"dhcp4": True}}}],
-                # "networks": [{"networkName": "THECROFT", "virtualDev": "vmxnet3", "macAddress": "00:0c:29:f2:dc:da", "cloudinit": {"eth0": {"dhcp4": False, "addresses": ["192.168.1.6/25"], "gateway4": "192.168.1.1", "nameservers": {"search": ["local.dougalseeley.com"], "addresses": ["192.168.1.2", "8.8.8.8", "8.8.4.4"]}}}}],
+                "networks": [],
                 "customvalues": [],
                 "wait": True,
-                "wait_timeout": 300
+                "wait_timeout": 180,
             }
 
             ## Delete VM
             # params = {
             #     "esxi_hostname": "192.168.1.3",
-            #     "esxi_username": "root",
+            #     "esxi_username": "svc",
             #     "esxi_password": None,
             #     "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
             #     "esxi_pkeystr": None,
-            #     "vm_name": "dstest1",
+            #     "vm_name": "test-asdf",
             #     "vm_id": None,
-            #     "state": "absent",
-            #     "wait": None,
-            #     "wait_timeout": None
+            #     "state": "absent"
             # }
 
             def exit_json(self, changed, **kwargs):
@@ -605,32 +667,39 @@ def main():
     # Check if the VM exists before continuing
     if module.params['state'] == 'absent':
         if iScraper.vm_id:
-            iScraper.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(iScraper.vm_id))
-            module.exit_json(changed=True, meta={"msg": "Deleted " + iScraper.vm_name + ": " + str(iScraper.vm_id)})
-        else:
-            module.fail_json(msg="vm already absent")
-    elif module.params['state'] == 'present':
-        if iScraper.vm_id and module.params['force'] is False:
-            module.fail_json(msg="vm already exists")
-        elif iScraper.vm_id and module.params['force']:
+            # If it's turned on, turn it off (can't destroy it if it's on)
             (stdin, stdout, stderr) = iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(iScraper.vm_id))
             if re.search('Powered on', stdout.read().decode('UTF-8')) is not None:
                 iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.off " + str(iScraper.vm_id))
 
             iScraper.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(iScraper.vm_id))
+            module.exit_json(changed=True, meta={"msg": "Deleted " + iScraper.vm_name + ": " + str(iScraper.vm_id)})
+        else:
+            module.exit_json(changed=False, meta={"msg": "VM " + iScraper.vm_name + ": " + str(iScraper.vm_id) + " already absent."})
 
-        iScraper.create_vm(module.params['vm_template'], module.params['datastore_path'], module.params['hardware'], module.params['guest_id'], module.params['disk'], module.params['cdrom'], module.params['customvalues'], module.params['networks'])
+    elif module.params['state'] == 'present':
+        # If the VM already exists, and the 'force' flag is set, then we delete it (and recreate it)
+        if iScraper.vm_id and module.params['force']:
+            # If it's turned on, turn it off (can't destroy it if it's on)
+            (stdin, stdout, stderr) = iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(iScraper.vm_id))
+            if re.search('Powered on', stdout.read().decode('UTF-8')) is not None:
+                iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.off " + str(iScraper.vm_id))
+            iScraper.esxiCnx.exec_command("vim-cmd vmsvc/destroy " + str(iScraper.vm_id))
+            iScraper.vm_id = None
 
-        iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(iScraper.vm_id))
+        # If the VM doesn't exist, create it.
+        if iScraper.vm_id is None:
+            iScraper.create_vm(module.params['vm_template'], module.params['datastore_path'], module.params['hardware'], module.params['guest_id'], module.params['disks'], module.params['cdrom'], module.params['customvalues'], module.params['networks'], module.params['cloudinit_userdata'])
+            iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(iScraper.vm_id))
+            iScraper.delete_cloudinit()
+            isChanged = True
+        else:
+            isChanged = False
 
-        iScraper.delete_cloudinit()
-
-        if module.params['wait']:
+        if "wait" in module.params and module.params['wait']:
             time_s = int(module.params['wait_timeout'])
-
             while time_s > 0:
                 (stdin, stdout, stderr) = iScraper.esxiCnx.exec_command("vim-cmd vmsvc/get.guest " + str(iScraper.vm_id))
-
                 guest_info = stdout.read().decode('UTF-8')
                 vm_params = re.search('\s*hostName\s*=\s*\"?(?P<vm_hostname>.*?)\"?,.*\n\s*ipAddress\s*=\s*\"?(?P<vm_ip>.*?)\"?,.*', guest_info)
                 if vm_params and vm_params.group('vm_ip') != "<unset>" and vm_params.group('vm_hostname') != "":
@@ -639,7 +708,7 @@ def main():
                     time.sleep(1)
                     time_s = time_s - 1
 
-            module.exit_json(changed=True,
+            module.exit_json(changed=isChanged,
                              guest_info=guest_info,
                              hostname=vm_params.group('vm_hostname'),
                              ip_address=vm_params.group('vm_ip'),
@@ -647,7 +716,7 @@ def main():
                              vm_id=iScraper.vm_id)
 
         else:
-            module.exit_json(changed=True,
+            module.exit_json(changed=isChanged,
                              hostname="",
                              ip_address="",
                              vm_name=module.params['vm_name'],
