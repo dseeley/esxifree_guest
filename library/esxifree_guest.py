@@ -155,9 +155,11 @@ EXAMPLES = r'''
       - name: dougal
         primary_group: dougal
         sudo: "ALL=(ALL) NOPASSWD:ALL"
-        groups: "sudo, wheel"
+        groups: "admin"
+        home: "/media/filestore/home/dougal"
         ssh_import_id: None
-        lock_passwd: true
+        lock_passwd: false
+        passwd: $6$j212wezy$7...YPYb2F
         ssh_authorized_keys: ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACA+.................GIMhdojtl6mzVn38vXMzSL29LQ== ansible@dougalseeley.com']
     disks:
       root: {"size_gb": 16, "type": "thin"}
@@ -192,7 +194,8 @@ EXAMPLES = r'''
       - name: dougal
         primary_group: dougal
         sudo: "ALL=(ALL) NOPASSWD:ALL"
-        groups: "sudo, wheel"
+        groups: "admin"
+        home: "/media/filestore/home/dougal"
         ssh_import_id: None
         lock_passwd: true
         ssh_authorized_keys: ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACA+.................GIMhdojtl6mzVn38vXMzSL29LQ== ansible@dougalseeley.com']
@@ -623,7 +626,7 @@ def main():
                 "datastore_path": "/vmfs/volumes/sata-raid10-4tb-01/",
                 "guest_id": "ubuntu-64",
                 "hardware": {},
-                "cloudinit_userdata": [{"name": "dougal", "primary_group": "dougal", "sudo": "ALL=(ALL) NOPASSWD:ALL", "groups": "sudo, wheel", "ssh_authorized_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDkfG8dfDWl0SpWG8prAxPGXg8xbi1ipM8A2BGK+zTAIftN0qJCmHJqLb4o7wCkFrwfaRZ18/sTpZzn+pyL8dGroinwTCL5EymFT2xD5YLM9gcel8RMj77WnIEtjEGHGC3PFf2TQ4m4OAlkdnn4muMoN6OJ44kJOx4saXqYwNaO/IWFEwrF0+pGiZwutah/txgC7IR+q8HJQ4Uv+x/3v48TV7EPKfCM5wX4iMuSia3Q+32SzZI7gbKqDgBgCFKgaV7NSTcFkwc2C4yHuLsoVIC5ZaByeJQ4WlvJgHb3KaAutr0PjHww+BiD/SVz6GwSjEpOuQur9xWf/+gZrHCjPFZvsQa95blMsyHkig837Xh4i8PR8TCopn6ERVaLHL4JINSIFaLF9sHnfP6C5ZVkQLemO7j8I9AmINwK+hXfkWdHD8wBRHo0lQkGPNRwJhwDcGa4nD/wjimN+BN4VK3l9ODf/74WNuXwyLQHTkqanCjI6ZDRIe2mUeYaoU2DH3Hi+CpQFC/BeKMivnrEOrsIwV2tPzZ0LruoBMQNt99rAq3/+Rmw+fZwJiqjsidsaY/i0QP1LPc8US5Li7XyA7QwXO2csNYHKTkXEetJFoWai7OzZYALf/iI+5bysPtuBqlNnnyNEOxKvVQg81xFIE5/GIMhdojtl6mzVn38vXMzSL29LQ== dougal@dougalseeley.com"]}],
+                "cloudinit_userdata": [{"name": "dougal", "primary_group": "dougal", "admin": "ALL=(ALL) NOPASSWD:ALL", "groups": "sudo, admin", "ssh_authorized_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDkfG8dfDWl0SpWG8prAxPGXg8xbi1ipM8A2BGK+zTAIftN0qJCmHJqLb4o7wCkFrwfaRZ18/sTpZzn+pyL8dGroinwTCL5EymFT2xD5YLM9gcel8RMj77WnIEtjEGHGC3PFf2TQ4m4OAlkdnn4muMoN6OJ44kJOx4saXqYwNaO/IWFEwrF0+pGiZwutah/txgC7IR+q8HJQ4Uv+x/3v48TV7EPKfCM5wX4iMuSia3Q+32SzZI7gbKqDgBgCFKgaV7NSTcFkwc2C4yHuLsoVIC5ZaByeJQ4WlvJgHb3KaAutr0PjHww+BiD/SVz6GwSjEpOuQur9xWf/+gZrHCjPFZvsQa95blMsyHkig837Xh4i8PR8TCopn6ERVaLHL4JINSIFaLF9sHnfP6C5ZVkQLemO7j8I9AmINwK+hXfkWdHD8wBRHo0lQkGPNRwJhwDcGa4nD/wjimN+BN4VK3l9ODf/74WNuXwyLQHTkqanCjI6ZDRIe2mUeYaoU2DH3Hi+CpQFC/BeKMivnrEOrsIwV2tPzZ0LruoBMQNt99rAq3/+Rmw+fZwJiqjsidsaY/i0QP1LPc8US5Li7XyA7QwXO2csNYHKTkXEetJFoWai7OzZYALf/iI+5bysPtuBqlNnnyNEOxKvVQg81xFIE5/GIMhdojtl6mzVn38vXMzSL29LQ== dougal@dougalseeley.com"]}],
                 "disks": {"root": {"size_gb": 16, "type": "thin"}, "mnt_copy": False, "mnt_new": []},
                 "cdrom": {"type": "client"},
                 "networks": [],
