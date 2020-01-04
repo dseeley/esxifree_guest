@@ -4,7 +4,7 @@ This module can be used to create new ESXi virtual machines, including cloning f
 
 It does so using Paramiko - without using the vSphere API - meaning it can be used on the free hypervisor.
 
-## configuration
+## Configuration
 Your ESXi host needs some config:
 + Enable SSH
   + Inside the web UI, navigate to “Manage”, then the “Services” tab. Find the entry called: “TSM-SSH”, and enable it.

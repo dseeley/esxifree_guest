@@ -73,7 +73,7 @@ options:
     - This parameter is case sensitive.
     - This parameter is required, while deploying new virtual machine.
     - 'Examples:'
-    - '   datastore_path: /vmfs/volumes/sata-raid10-4tb-01/'
+    - '   datastore_path: /vmfs/volumes/4tb-evo860-ssd/'
     - '   datastore_path: /vmfs/volumes/datastore1/'
   guest_id:
     description:
@@ -145,11 +145,11 @@ EXAMPLES = r'''
     esxi_hostname: "192.168.1.3"
     esxi_username: "svc"
     esxi_pkeystr: "{{ esxi_pkeystr }}"
-    datastore_path: "/vmfs/volumes/sata-raid10-4tb-01/"
+    datastore_path: "/vmfs/volumes/4tb-evo860-ssd/"
     vm_name: "test_asdf"
     state: present
     guest_id: ubuntu-64
-    hardware: {"version": "14", "num_cpus": "2", "memory_mb": "2048"}
+    hardware: {"version": "15", "num_cpus": "2", "memory_mb": "2048"}
     cloudinit_userdata:
       - default
       - name: dougal
@@ -163,8 +163,7 @@ EXAMPLES = r'''
         ssh_authorized_keys: ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACA+.................GIMhdojtl6mzVn38vXMzSL29LQ== ansible@dougalseeley.com']
     disks:
       root: {"size_gb": 16, "type": "thin"}
-      mnt_copy: False,
-      mnt_new: [{"size_gb": 50, "type": "thin"}]
+      volumes: [{"size_gb": 5, "type": "thin"},{"size_gb": 2, "type": "thin"}]
     networks:
       - networkName: VM Network
         virtualDev: vmxnet3
@@ -183,12 +182,12 @@ EXAMPLES = r'''
     esxi_hostname: "192.168.1.3"
     esxi_username: "svc"
     esxi_pkeystr: "{{ esxi_pkeystr }}"
-    datastore_path: "/vmfs/volumes/sata-raid10-4tb-01/"
+    datastore_path: "/vmfs/volumes/4tb-evo860-ssd/"
     vm_template: "ubuntu1804-packer-template"
     vm_name: "test_asdf"
     state: present
     guest_id: ubuntu-64
-    hardware: {"version": "14", "num_cpus": "2", "memory_mb": "2048"}
+    hardware: {"version": "15", "num_cpus": "2", "memory_mb": "2048"}
     cloudinit_userdata:
       - default
       - name: dougal
@@ -201,8 +200,7 @@ EXAMPLES = r'''
         ssh_authorized_keys: ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACA+.................GIMhdojtl6mzVn38vXMzSL29LQ== ansible@dougalseeley.com']
     disks:
       root: {}
-      mnt_copy: False,
-      mnt_new: [{"size_gb": 25, "type": "thin"}]
+      volumes: [{"size_gb": 5, "type": "thin"},{"size_gb": 2, "type": "thin"}]
     networks:
       - networkName: VM Network
         virtualDev: vmxnet3
@@ -242,9 +240,13 @@ import collections
 import paramiko
 import sys
 import os
-import io
 import base64
 import yaml
+
+if sys.version_info[0] < 3:
+    from io import BytesIO as StringIO
+else:
+    from io import StringIO
 
 # paramiko.util.log_to_file("paramiko.log")
 # paramiko.common.logging.basicConfig(level=paramiko.common.DEBUG)
@@ -262,7 +264,7 @@ class SSHCmdExec(object):
 
         try:
             if pkeystr and pkeystr != "":
-                pkey_fromstr = paramiko.RSAKey.from_private_key(io.StringIO(pkeystr), password)
+                pkey_fromstr = paramiko.RSAKey.from_private_key(StringIO(pkeystr), password)
             if pkeyfile and pkeyfile != "":
                 pkey_fromfile = paramiko.RSAKey.from_private_key_file(pkeyfile, password)
         except paramiko.ssh_exception.PasswordRequiredException as auth_err:
@@ -425,7 +427,7 @@ class esxiFreeScraper(object):
                     vmxDict.update({"scsi0:0.present": "TRUE"})
                     vmxDict.update({"scsi0:0.filename": disk_filename})
                     diskCount = diskCount + 1
-                if "mnt_copy" in disks:
+                if "volumes" not in disks or ("volumes" in disks and disks["volumes"] is None):
                     while "scsi0:" + str(diskCount) + ".filename" in templ_vmxDict:
                         # See if vmTemplate disk exists
                         try:
@@ -473,7 +475,7 @@ class esxiFreeScraper(object):
                 vmxDict.update({"ide0:0.startconnected": "TRUE"})
 
         # Network settings
-        cloudinit_nets = {"version": 2, "ethernets": {}}
+        cloudinit_nets = {"version": 2}
         for netCount in range(0, len(networks)):
             vmxDict.update({"ethernet" + str(netCount) + ".virtualdev": networks[netCount]['virtualDev']})
             vmxDict.update({"ethernet" + str(netCount) + ".networkname": networks[netCount]['networkName']})
@@ -484,8 +486,8 @@ class esxiFreeScraper(object):
             else:
                 vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
             vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
-            if "cloudinit_ethernets" in networks[netCount]:
-                cloudinit_nets.update({"ethernets": networks[netCount]['cloudinit_ethernets']})
+            if "cloudinit_netplan" in networks[netCount]:
+                cloudinit_nets.update(networks[netCount]['cloudinit_netplan'])
 
         # Add cloud-init metadata (hostname & network)
         cloudinit_metadata = {"local-hostname": self.vm_name}
@@ -513,12 +515,12 @@ class esxiFreeScraper(object):
             vmxDict.update({"scsi0:0.present": "TRUE"})
             vmxDict.update({"scsi0:0.filename": disk_filename})
             diskCount = diskCount + 1
-        if "mnt_new" in disks:
-            for newDiskIdx in range(len(disks["mnt_new"])):
+        if "volumes" in disks:
+            for newDiskIdx in range(len(disks["volumes"])):
                 vmxDict_diskIdx = newDiskIdx + diskCount
                 disk_filename = self.vm_name + "_" + str(vmxDict_diskIdx) + ".vmdk"
 
-                (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disks["mnt_new"][newDiskIdx]['size_gb']) + "G -d " + disks["mnt_new"][newDiskIdx]['type'] + " " + vmPath + "/" + disk_filename)
+                (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disks["volumes"][newDiskIdx]['size_gb']) + "G -d " + disks["volumes"][newDiskIdx]['type'] + " " + vmPath + "/" + disk_filename)
 
                 vmxDict.update({"scsi0:" + str(vmxDict_diskIdx) + ".devicetype": "scsi-hardDisk"})
                 vmxDict.update({"scsi0:" + str(vmxDict_diskIdx) + ".present": "TRUE"})
@@ -526,7 +528,7 @@ class esxiFreeScraper(object):
 
         # Dump the VMX
         # print(json.dumps(vmxDict, sort_keys=True, indent=4, separators=(',', ': ')))
-        vmxStr = io.StringIO()
+        vmxStr = StringIO()
         for vmxKey, vmxVal in vmxDict.items():
             vmxStr.write(str(vmxKey.lower()) + " = " + "\"" + str(vmxVal) + "\"\n")
         vmxStr.seek(0)
@@ -549,12 +551,12 @@ class esxiFreeScraper(object):
         if 'guestinfo.userdata.encoding' in vmxDict:
             del vmxDict['guestinfo.userdata.encoding']
 
-        # Dump the VMX
-        vmxStr = io.StringIO()
+        vmxStr = StringIO()
         for vmxKey, vmxVal in vmxDict.items():
             vmxStr.write(str(vmxKey.lower()) + " = " + "\"" + str(vmxVal) + "\"\n")
         vmxStr.seek(0)
         sftp_cnx = self.esxiCnx.get_sftpClient()
+        sftp_cnx.remove(vmxPath)
         sftp_cnx.putfo(vmxStr, vmxPath, file_size=0, callback=None, confirm=True)
 
 
@@ -572,9 +574,9 @@ def main():
         "force": {"type": "bool", "default": False},
         "datastore_path": {"type": "str"},
         "guest_id": {"type": "str", "default": "ubuntu-64"},
-        "hardware": {"type": "dict", "default": {"version": "14", "num_cpus": "2", "memory_mb": "2048"}},
+        "hardware": {"type": "dict", "default": {"version": "15", "num_cpus": "2", "memory_mb": "2048"}},
         "cloudinit_userdata": {"type": "list", "default": []},
-        "disks": {"type": "dict", "default": {"root": {"size_gb": 16, "type": "thin"}, "mnt_copy": False, "mnt_new": [{"size_gb": 50, "type": "thin"}]}},
+        "disks": {"type": "dict", "default": {"root": {"size_gb": 16, "type": "thin"}}},
         "cdrom": {"type": "dict", "default": {"type": "client"}},
         "networks": {"type": "list", "default": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}]},
         "customvalues": {"type": "list", "default": []},
@@ -582,7 +584,7 @@ def main():
         "wait_timeout": {"type": "int", "default": 180}
     }
 
-    if not (os.name == 'nt' and (len(sys.argv) > 1 and sys.argv[1] == "console")):
+    if not (len(sys.argv) > 1 and sys.argv[1] == "console"):
         module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True, required_one_of=[['vm_name', 'vm_id'], ['esxi_password', 'esxi_pkeyfile', 'esxi_pkeystr']])
     else:
         # For testing without Ansible (e.g on Windows)
@@ -599,12 +601,12 @@ def main():
             #     "vm_template": None,
             #     "state": "present",
             #     "force": False,
-            #     "datastore_path": "/vmfs/volumes/sata-raid10-4tb-01/",
+            #     "datastore_path": "/vmfs/volumes/4tb-evo860-ssd/",
             #     "guest_id": "ubuntu-64",
-            #     "hardware": {"version": "14", "num_cpus": "2", "memory_mb": "2048"},
+            #     "hardware": {"version": "15", "num_cpus": "2", "memory_mb": "2048"},
             #     "cloudinit_userdata": [],
-            #     "disks": {"root": {"size_gb": 16, "type": "thin"}, "mnt_copy": False, "mnt_new": [{"size_gb": 50, "type": "thin"}]},
-            #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/sata-raid10-4tb-01/ISOs/ubuntu-18.04.2-server-amd64.iso"},
+            #     "disks": {"root": {"size_gb": 16, "type": "thin"}, "volumes": [{"size_gb": 5, "type": "thin"},{"size_gb": 2, "type": "thin"}]},
+            #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.2-server-amd64.iso"},
             #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}],
             #     "customvalues": [],
             #     "wait": True,
@@ -620,16 +622,16 @@ def main():
                 "esxi_pkeystr": None,
                 "vm_name": "test-asdf",
                 "vm_id": None,
-                "vm_template": "ubuntu1804-packer-template",
+                "vm_template": "gold-ubuntu2004-20200104173453",
                 "state": "present",
                 "force": False,
-                "datastore_path": "/vmfs/volumes/sata-raid10-4tb-01/",
+                "datastore_path": "/vmfs/volumes/4tb-evo860-ssd/",
                 "guest_id": "ubuntu-64",
-                "hardware": {},
-                "cloudinit_userdata": [{"name": "dougal", "primary_group": "dougal", "admin": "ALL=(ALL) NOPASSWD:ALL", "groups": "sudo, admin", "ssh_authorized_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDkfG8dfDWl0SpWG8prAxPGXg8xbi1ipM8A2BGK+zTAIftN0qJCmHJqLb4o7wCkFrwfaRZ18/sTpZzn+pyL8dGroinwTCL5EymFT2xD5YLM9gcel8RMj77WnIEtjEGHGC3PFf2TQ4m4OAlkdnn4muMoN6OJ44kJOx4saXqYwNaO/IWFEwrF0+pGiZwutah/txgC7IR+q8HJQ4Uv+x/3v48TV7EPKfCM5wX4iMuSia3Q+32SzZI7gbKqDgBgCFKgaV7NSTcFkwc2C4yHuLsoVIC5ZaByeJQ4WlvJgHb3KaAutr0PjHww+BiD/SVz6GwSjEpOuQur9xWf/+gZrHCjPFZvsQa95blMsyHkig837Xh4i8PR8TCopn6ERVaLHL4JINSIFaLF9sHnfP6C5ZVkQLemO7j8I9AmINwK+hXfkWdHD8wBRHo0lQkGPNRwJhwDcGa4nD/wjimN+BN4VK3l9ODf/74WNuXwyLQHTkqanCjI6ZDRIe2mUeYaoU2DH3Hi+CpQFC/BeKMivnrEOrsIwV2tPzZ0LruoBMQNt99rAq3/+Rmw+fZwJiqjsidsaY/i0QP1LPc8US5Li7XyA7QwXO2csNYHKTkXEetJFoWai7OzZYALf/iI+5bysPtuBqlNnnyNEOxKvVQg81xFIE5/GIMhdojtl6mzVn38vXMzSL29LQ== dougal@dougalseeley.com"]}],
-                "disks": {"root": {"size_gb": 16, "type": "thin"}, "mnt_copy": False, "mnt_new": []},
+                "hardware": {"version": "15", "num_cpus": "2", "memory_mb": "2048"},
+                "cloudinit_userdata": [],
+                "disks": {"volumes": [{"size_gb": 2, "type": "thin"}]},
                 "cdrom": {"type": "client"},
-                "networks": [],
+                "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit_netplan": {"ethernets": {"eth0": {"dhcp4": True}}}}],
                 "customvalues": [],
                 "wait": True,
                 "wait_timeout": 180,
@@ -694,6 +696,18 @@ def main():
         if iScraper.vm_id is None:
             iScraper.create_vm(module.params['vm_template'], module.params['datastore_path'], module.params['hardware'], module.params['guest_id'], module.params['disks'], module.params['cdrom'], module.params['customvalues'], module.params['networks'], module.params['cloudinit_userdata'])
             iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(iScraper.vm_id))
+
+            # Wait for the VM to start up
+            time_s = int(module.params['wait_timeout'])
+            while time_s > 0:
+                (stdin, stdout, stderr) = iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(iScraper.vm_id))
+                if re.search('Powered on', stdout.read().decode('UTF-8')) is not None:
+                    break
+                else:
+                    time.sleep(1)
+                    time_s = time_s - 1
+
+            # Delete the cloud-init config
             iScraper.delete_cloudinit()
             isChanged = True
         else:

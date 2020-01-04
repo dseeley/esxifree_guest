@@ -1,7 +1,13 @@
 ---
-
+# 6.7
 # https://code.vmware.com/apis/358/vsphere#/doc/vim.vm.GuestOsDescriptor.GuestOsIdentifier.html
 
+# 6.7u3
+# https://code.vmware.com/apis/704/vsphere/vim.vm.GuestOsDescriptor.GuestOsIdentifier.html
+
+- amazonlinux2_64Guest:
+    DescName: "Amazon Linux 2 (64 bit)"
+    Since: "vSphere API 6.7.1"
 - asianux3_64Guest:
     DescName: "Asianux Server 3 (64 bit)"
     Since: "vSphere API 4.0"
@@ -129,7 +135,7 @@
     DescName: "Debian GNU/Linux 9"
     Since: "vSphere API 6.5"
 - dosGuest:
-    DescName: MS-DOS.
+    DescName: "MS-DOS."
     Since: ""
 - eComStation2Guest:
     DescName: "eComStation 2.0"
@@ -159,7 +165,7 @@
     DescName: "FreeBSD x64"
     Since: ""
 - freebsdGuest:
-    DescName: FreeBSD
+    DescName: "FreeBSD"
     Since: ""
 - genericLinuxGuest:
     DescName: "Other Linux"
@@ -222,7 +228,7 @@
     DescName: "Oracle Linux 4/5"
     Since: "vSphere API 4.1"
 - os2Guest:
-    DescName: OS/2
+    DescName: "OS/2"
     Since: ""
 - other24xLinux64Guest:
     DescName: "Linux 2.4x Kernel (64 bit) (experimental)"
@@ -360,7 +366,7 @@
     DescName: "Turbolinux (64 bit)"
     Since: "vSphere API 4.0"
 - turboLinuxGuest:
-    DescName: Turbolinux
+    DescName: "Turbolinux"
     Since: ""
 - ubuntu64Guest:
     DescName: "Ubuntu Linux (64 bit)"
@@ -447,7 +453,7 @@
     DescName: "Windows Small Business Server 2003"
     Since: ""
 - winNetDatacenter64Guest:
-    DescName: "Windows Server 2003, Datacenter Edition(64 bit)(experimental)"
+    DescName: "Windows Server 2003, Datacenter Edition (64 bit) (experimental)"
     Since: "VI API 2.5"
 - winNetDatacenterGuest:
     DescName: "Windows Server 2003, Datacenter Edition"
