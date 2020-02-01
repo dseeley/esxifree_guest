@@ -242,6 +242,8 @@ import sys
 import os
 import base64
 import yaml
+import errno  # For the python2.7 IOError, because FileNotFound is for python3
+
 
 if sys.version_info[0] < 3:
     from io import BytesIO as StringIO
@@ -380,7 +382,28 @@ class esxiFreeScraper(object):
 
             return vmxPath, vmxFileDict
 
+    def put_vmx(self, vmxDict, vmxPath):
+        # Dump the VMX
+        # print(json.dumps(vmxDict, sort_keys=True, indent=4, separators=(',', ': ')))
+
+        vmxDict = collections.OrderedDict(sorted(vmxDict.items()))
+        vmxStr = StringIO()
+        for vmxKey, vmxVal in vmxDict.items():
+            vmxStr.write(str(vmxKey.lower()) + " = " + "\"" + str(vmxVal) + "\"\n")
+        vmxStr.seek(0)
+        sftp_cnx = self.esxiCnx.get_sftpClient()
+        try:
+            sftp_cnx.stat(vmxPath)
+            sftp_cnx.remove(vmxPath)
+        except IOError as e:  # python 2.7
+            if e.errno == errno.ENOENT:
+                pass
+        except FileNotFoundError:  # python 3.x
+            pass
+        sftp_cnx.putfo(vmxStr, vmxPath, file_size=0, callback=None, confirm=True)
+
     def create_vm(self, vmTemplate=None, datastore_path=None, hardware=None, guest_id=None, disks=None, cdrom=None, customvalues=None, networks=None, cloudinit_userdata=None):
+
         # Create VM directory
         vmPath = datastore_path + "/" + self.vm_name
         self.esxiCnx.exec_command("mkdir -p " + vmPath)
@@ -427,6 +450,7 @@ class esxiFreeScraper(object):
                     vmxDict.update({"scsi0:0.present": "TRUE"})
                     vmxDict.update({"scsi0:0.filename": disk_filename})
                     diskCount = diskCount + 1
+                # If no new volumes have been defined, or have been deliberately set to None, copy existing from template
                 if "volumes" not in disks or ("volumes" in disks and disks["volumes"] is None):
                     while "scsi0:" + str(diskCount) + ".filename" in templ_vmxDict:
                         # See if vmTemplate disk exists
@@ -443,6 +467,8 @@ class esxiFreeScraper(object):
                             vmxDict.update({"scsi0:" + str(diskCount) + ".present": "TRUE"})
                             vmxDict.update({"scsi0:" + str(diskCount) + ".filename": disk_filename})
                             diskCount = diskCount + 1
+            else:
+                return (vmTemplate + " not found!")
 
         ## Now add remaining settings, overriding template copies.
 
@@ -508,6 +534,9 @@ class esxiFreeScraper(object):
 
         # Disk settings
         if "scsi0:0.filename" not in vmxDict:
+            if "root" not in disks:
+                return ("Root disk parameters not defined for new VM")
+
             disk_filename = self.vm_name + ".vmdk"
             (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disks["root"]['size_gb']) + "G -d " + disks["root"]['type'] + " " + vmPath + "/" + disk_filename)
 
@@ -526,14 +555,8 @@ class esxiFreeScraper(object):
                 vmxDict.update({"scsi0:" + str(vmxDict_diskIdx) + ".present": "TRUE"})
                 vmxDict.update({"scsi0:" + str(vmxDict_diskIdx) + ".filename": disk_filename})
 
-        # Dump the VMX
-        # print(json.dumps(vmxDict, sort_keys=True, indent=4, separators=(',', ': ')))
-        vmxStr = StringIO()
-        for vmxKey, vmxVal in vmxDict.items():
-            vmxStr.write(str(vmxKey.lower()) + " = " + "\"" + str(vmxVal) + "\"\n")
-        vmxStr.seek(0)
-        sftp_cnx = self.esxiCnx.get_sftpClient()
-        sftp_cnx.putfo(vmxStr, vmPath + "/" + self.vm_name + ".vmx", file_size=0, callback=None, confirm=True)
+        # write the vmx
+        self.put_vmx(vmxDict, vmPath + "/" + self.vm_name + ".vmx")
 
         # Register the VM
         (stdin, stdout, stderr) = self.esxiCnx.exec_command("vim-cmd solo/registervm " + vmPath + "/" + self.vm_name + ".vmx")
@@ -551,13 +574,8 @@ class esxiFreeScraper(object):
         if 'guestinfo.userdata.encoding' in vmxDict:
             del vmxDict['guestinfo.userdata.encoding']
 
-        vmxStr = StringIO()
-        for vmxKey, vmxVal in vmxDict.items():
-            vmxStr.write(str(vmxKey.lower()) + " = " + "\"" + str(vmxVal) + "\"\n")
-        vmxStr.seek(0)
-        sftp_cnx = self.esxiCnx.get_sftpClient()
-        sftp_cnx.remove(vmxPath)
-        sftp_cnx.putfo(vmxStr, vmxPath, file_size=0, callback=None, confirm=True)
+        # write the vmx
+        self.put_vmx(vmxDict, vmxPath)
 
 
 def main():
@@ -614,28 +632,28 @@ def main():
             # }
 
             ## Clone VM
-            params = {
-                "esxi_hostname": "192.168.1.3",
-                "esxi_username": "svc",
-                "esxi_password": None,
-                "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
-                "esxi_pkeystr": None,
-                "vm_name": "test-asdf",
-                "vm_id": None,
-                "vm_template": "gold-ubuntu2004-20200104173453",
-                "state": "present",
-                "force": False,
-                "datastore_path": "/vmfs/volumes/4tb-evo860-ssd/",
-                "guest_id": "ubuntu-64",
-                "hardware": {"version": "15", "num_cpus": "2", "memory_mb": "2048"},
-                "cloudinit_userdata": [],
-                "disks": {"volumes": [{"size_gb": 2, "type": "thin"}]},
-                "cdrom": {"type": "client"},
-                "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit_netplan": {"ethernets": {"eth0": {"dhcp4": True}}}}],
-                "customvalues": [],
-                "wait": True,
-                "wait_timeout": 180,
-            }
+            # params = {
+            #     "esxi_hostname": "192.168.1.3",
+            #     "esxi_username": "svc",
+            #     "esxi_password": None,
+            #     "esxi_pkeyfile": "../id_rsa_esxisvc_nopw",
+            #     "esxi_pkeystr": None,
+            #     "vm_name": "test-asdf",
+            #     "vm_id": None,
+            #     "vm_template": "gold-ubuntu1804-20200104203707",
+            #     "state": "present",
+            #     "force": False,
+            #     "datastore_path": "/vmfs/volumes/4tb-evo860-ssd/",
+            #     "guest_id": "ubuntu-64",
+            #     "hardware": {"version": "15", "num_cpus": "2", "memory_mb": "2048"},
+            #     "cloudinit_userdata": [],
+            #     "disks": {"volumes": [{"size_gb": 2, "type": "thin"}]},
+            #     "cdrom": {"type": "client"},
+            #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit_netplan": {"ethernets": {"eth0": {"dhcp4": True}}}}],
+            #     "customvalues": [],
+            #     "wait": True,
+            #     "wait_timeout": 180,
+            # }
 
             ## Delete VM
             # params = {
@@ -666,6 +684,8 @@ def main():
                                vm_name=module.params['vm_name'],
                                vm_id=module.params['vm_id'])
 
+    # module.fail_json(msg=str(module.params['disks']))
+
     if iScraper.vm_id is None and iScraper.vm_name is None:
         module.fail_json(msg="If VM doesn't already exist, you must provide a name for it")
 
@@ -694,7 +714,9 @@ def main():
 
         # If the VM doesn't exist, create it.
         if iScraper.vm_id is None:
-            iScraper.create_vm(module.params['vm_template'], module.params['datastore_path'], module.params['hardware'], module.params['guest_id'], module.params['disks'], module.params['cdrom'], module.params['customvalues'], module.params['networks'], module.params['cloudinit_userdata'])
+            createVmResult = iScraper.create_vm(module.params['vm_template'], module.params['datastore_path'], module.params['hardware'], module.params['guest_id'], module.params['disks'], module.params['cdrom'], module.params['customvalues'], module.params['networks'], module.params['cloudinit_userdata'])
+            if createVmResult != None:
+                module.fail_json(msg=createVmResult)
             iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.on " + str(iScraper.vm_id))
 
             # Wait for the VM to start up
