@@ -2,7 +2,7 @@
 
 This module can be used to create new ESXi virtual machines, including cloning from templates or other virtual machines. 
 
-It does so using Paramiko - without using the vSphere API - meaning it can be used on the free hypervisor.
+It does so using direct SOAP calls and Paramiko SSH to the host - without using the vSphere API - meaning it can be used on the free hypervisor.
 
 ## Configuration
 Your ESXi host needs some config:
