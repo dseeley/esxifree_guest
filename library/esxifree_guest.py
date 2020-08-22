@@ -567,6 +567,11 @@ class esxiFreeScraper(object):
 
         ## Sanity checks
         for dryRunDisk in [newDisk for newDisk in disks if ('src' in newDisk and newDisk['src'] is not None)]:
+            if 'copy_or_move' not in dryRunDisk['src']:
+                return ("'copy_or_move' parameter is mandatory when src is specified for a disk.")
+            if 'backing_filename' not in dryRunDisk['src']:
+                return ("'backing_filename' parameter is mandatory when src is specified for a disk.")
+
             dryRunDiskFileInfo = re.search('^\[(?P<datastore>.*?)\] *(?P<fulldiskpath>.*\/(?P<filepath>(?P<fileroot>.*?)(?:--(?P<diskname_suffix>.*?))?\.vmdk))$', dryRunDisk['src']['backing_filename'])
             try:
                 self.esxiCnx.exec_command("vmkfstools -g /vmfs/volumes/" + dryRunDiskFileInfo.group('datastore') + "/" + dryRunDiskFileInfo.group('fulldiskpath'))
@@ -761,11 +766,6 @@ class esxiFreeScraper(object):
                 (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat " + vmPathDest + "/" + disk_filename)
             except IOError as e:
                 if 'src' in newDisk and newDisk['src'] is not None:
-                    if 'copy_or_move' not in newDisk['src']:
-                        return ("'copy_or_move' parameter is mandatory when src is specified for a disk.")
-                    if 'backing_filename' not in newDisk['src']:
-                        return ("'backing_filename' parameter is mandatory when src is specified for a disk.")
-
                     cloneSrcBackingFile = re.search('^\[(?P<datastore>.*?)\] *(?P<fulldiskpath>.*\/(?P<filepath>(?P<fileroot>.*?)(?:--(?P<diskname_suffix>.*?))?\.vmdk))$', newDisk['src']['backing_filename'])
                     try:
                         (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath'))
