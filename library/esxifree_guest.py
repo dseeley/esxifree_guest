@@ -711,8 +711,10 @@ class esxiFreeScraper(object):
             vmxDict.update({"vcpu.hotadd": hardware['hotadd_cpu']})
         if 'hotadd_memory' in hardware:
             vmxDict.update({"mem.hotadd": hardware['hotadd_memory']})
-        if 'memory_reservation_lock' in hardware:
-            vmxDict.update({"sched.mem.pin": hardware['memory_reservation_lock']})
+        if 'memory_reservation_lock' in hardware and hardware['memory_reservation_lock'] in [True, 'TRUE', 'True', 'true', 'yes']:
+            vmxDict.update({"sched.mem.pin": "TRUE"})
+            vmxDict.update({"sched.mem.min": hardware['memory_mb']})
+            vmxDict.update({"sched.mem.minSize": hardware['memory_mb']})
 
         # CDROM settings
         if cdrom['type'] == 'client':
