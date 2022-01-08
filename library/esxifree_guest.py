@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021, Dougal Seeley
+# Copyright (c) 2022, Dougal Seeley
 # https://github.com/dseeley/esxifree_guest
 # BSD 3-Clause License
 
@@ -26,8 +26,7 @@ requirements:
 - paramiko
 - xmltodict
 notes:
-    - Please make sure that the user used for esxifree_guest should have correct level of privileges.
-    - Tested on vSphere 7.0.2
+  - Tested on ESXi 7.0u2
 options:
   hostname:
     description:

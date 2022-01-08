@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021, Dougal Seeley
+# Copyright (c) 2022, Dougal Seeley
 # https://github.com/dseeley/esxifree_guest
 # BSD 3-Clause License
 
@@ -16,7 +16,7 @@ DOCUMENTATION = r'''
 module: esxifree_guest_info
 short_description: Retrieves virtual machine info in ESXi without a dependency on the vSphere/ vCenter API.
 description: >
-   This module can be used to retrieve virtual machine info. When fetching all VM info, does so atomically (a single SOAP call), to prevent race conditions.
+   This module can be used to retrieve virtual machine info. When fetching all VM info, does so atomically (a single SOAP call), to prevent race conditions.  Returns VMs in moid order (which is also chronological)
 version_added: '2.9'
 author:
 - Dougal Seeley (ansible@dougalseeley.com)
@@ -24,8 +24,7 @@ requirements:
 - python >= 2.7
 - xmltodict
 notes:
-    - Please make sure that the user used for esxifree_guest should have correct level of privileges.
-    - Tested on vSphere 7.0.2
+  - Tested on ESXi 7.0u2
 options:
   hostname:
     description:
@@ -42,6 +41,11 @@ options:
     - The password of C(username) for the ESXi server, or the password for the private key (if required).
     required: true
     type: str
+  filters:
+    description:
+    - A dictionary of filters.  Only 'hw_name' currently supported.
+    required: false
+    type: dict
   name:
     description:
     - Name of the virtual machine to retrieve (optional).
@@ -59,6 +63,14 @@ EXAMPLES = r'''
     hostname: "192.168.1.3"
     username: "svc"
     password: "my_passsword"
+  delegate_to: localhost
+
+- name: Get virtual machine for all VMs that match the name "gold-ubuntu2004-*".
+  esxifree_guest_info:
+    hostname: "192.168.1.3"
+    username: "svc"
+    password: "my_passsword"
+    filters: { hw_name: "gold-ubuntu2004-*" }
   delegate_to: localhost
 
 - name: Get virtual machine for specific VM
@@ -128,8 +140,8 @@ class vmw_soap_client(object):
         envelope = '<Envelope xmlns="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' + '<Body>' + str(envelope_body) + '</Body></Envelope>'
         cj = CookieJar()
         req = Request(
-                url='https://' + self.host + '/sdk/vimService.wsdl', data=envelope.encode(),
-                headers={"Content-Type": "text/xml", "SOAPAction": "urn:vim25/6.7.3", "Accept": "*/*", "Cookie": "vmware_client=VMware; vmware_soap_session=" + str(self.vmware_soap_session_cookie)})
+            url='https://' + self.host + '/sdk/vimService.wsdl', data=envelope.encode(),
+            headers={"Content-Type": "text/xml", "SOAPAction": "urn:vim25/6.7.3", "Accept": "*/*", "Cookie": "vmware_client=VMware; vmware_soap_session=" + str(self.vmware_soap_session_cookie)})
 
         opener = build_opener(HTTPSHandler(context=ssl._create_unverified_context()), HTTPCookieProcessor(cj))
         num_send_attempts = 3
@@ -154,16 +166,16 @@ class esxiFreeScraper(object):
     def __init__(self, hostname, username='root', password=None):
         self.soap_client = vmw_soap_client(host=hostname, username=username, password=password)
 
-    def get_vm_info(self, name=None, moid=None):
+    def get_vm_info(self, name=None, moid=None, filters=None):
         if moid:
             response, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>true</all></propSet><objectSet><obj type="VirtualMachine">' + str(moid) + '</obj><skip>false</skip></objectSet></specSet><options/></RetrievePropertiesEx>')
             xmltodictresponse = xmltodict.parse(response.read())
             return (self.parse_vm(xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']))
         elif name:
-            virtual_machines = self.get_all_vm_info()
+            virtual_machines = self.get_all_vm_info(filters)
             return ([vm for vm in virtual_machines if vm['hw_name'] == name][0])
 
-    def get_all_vm_info(self):
+    def get_all_vm_info(self, filters=None):
         response, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>false</all><pathSet>name</pathSet><pathSet>config</pathSet><pathSet>configStatus</pathSet><pathSet>datastore</pathSet><pathSet>guest</pathSet><pathSet>layout</pathSet><pathSet>layoutEx</pathSet><pathSet>runtime</pathSet></propSet><objectSet><obj type="Folder">ha-folder-vm</obj><selectSet xsi:type="TraversalSpec"><name>traverseChild</name><type>Folder</type><path>childEntity</path> <selectSet><name>traverseChild</name></selectSet><selectSet xsi:type="TraversalSpec"><type>Datacenter</type><path>vmFolder</path><selectSet><name>traverseChild</name></selectSet> </selectSet> </selectSet> </objectSet></specSet><options type="RetrieveOptions"></options></RetrievePropertiesEx>')
         xmltodictresponse = xmltodict.parse(response.read())
 
@@ -171,7 +183,13 @@ class esxiFreeScraper(object):
         for vm_instance in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']:
             virtual_machines.append(self.parse_vm(vm_instance))
 
-        return (virtual_machines)
+        # Sort the VMs in order of moid (which is also chronological)
+        virtual_machines.sort(key=lambda vm: int(vm['moid']))
+
+        if filters and 'hw_name' in filters:
+            return ([vm for vm in virtual_machines if re.search(filters['hw_name'], vm['hw_name'])])
+        else:
+            return (virtual_machines)
 
     # Return the parameter of an object but only if present, else return None.
     def _getObjSafe(self, inDict, *keys):
@@ -239,6 +257,7 @@ def main():
         "hostname": {"type": "str", "required": True},
         "username": {"type": "str", "required": True},
         "password": {"type": "str", "required": True},
+        "filters": {"type": "dict", "required": False},
         "name": {"type": "str"},
         "moid": {"type": "str"}
     }
@@ -253,6 +272,7 @@ def main():
             "hostname": "192.168.1.3",
             "username": "svc",
             "password": sys.argv[2],
+            "filters": {"hw_name": "gold-*"},
             "name": None,  # "parsnip-prod-sys-a0-1616868999",
             "moid": None  # 350
         }
@@ -260,9 +280,9 @@ def main():
     iScraper = esxiFreeScraper(hostname=module.params['hostname'], username=module.params['username'], password=module.params['password'])
 
     if ("moid" in module.params and module.params['name']) or ("name" in module.params and module.params['moid']):
-        vm_info = iScraper.get_vm_info(name=module.params['name'], moid=module.params['moid'])
+        vm_info = iScraper.get_vm_info(name=module.params['name'], moid=module.params['moid'], filters=module.params['filters'])
     else:
-        vm_info = iScraper.get_all_vm_info()
+        vm_info = iScraper.get_all_vm_info(filters=module.params['filters'])
 
     module.exit_json(changed=False, virtual_machines=vm_info)
 
