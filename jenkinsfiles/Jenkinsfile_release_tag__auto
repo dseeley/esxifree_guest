@@ -1,0 +1,7 @@
+#!groovy
+
+node {
+    stage('Call esxifree_guest/esxifree_guest-release-tag') {
+        build job: 'esxifree_guest/esxifree_guest-release-tag', parameters: [string(name: 'NEW_VERSION', value: "next")]
+    }
+}

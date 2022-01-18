@@ -1,0 +1,32 @@
+namespace: dseeley
+
+name: esxifree_guest
+
+version: AUTOFILLED_BY_JENKINS
+
+readme: README.md
+
+authors:
+- Dougal Seeley <github@dougalseeley.com>
+
+description: This plugin can be used to create new ESXi virtual machines, including cloning from templates or other virtual machines.
+
+#license:
+#- BSD-3-Clause
+
+license_file: 'LICENSE'
+
+tags: ['aws', 'gcp', 'azure', 'storage', 'cluster', 'cloud', 'system']
+
+dependencies: {}
+
+repository: https://github.com/dseeley/esxifree_guest
+
+documentation: https://github.com/dseeley/esxifree_guest/blob/master/README.md
+
+homepage: https://github.com/dseeley/esxifree_guest
+
+issues: https://github.com/dseeley/esxifree_guest/issues
+
+build_ignore: [ '.idea', '.gitignore' ]
+

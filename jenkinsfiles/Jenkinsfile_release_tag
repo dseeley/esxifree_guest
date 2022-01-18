@@ -1,0 +1,119 @@
+#!groovy
+import groovy.json.JsonOutput
+
+def PROJECT_URL_DEFAULT = "https://github.com/dseeley/esxifree_guest"
+def PROJECT_BRANCH_DEFAULT = "master"       //Set the default git branch to use if we're not running an SCM job (e.g. if we're copying/pasting into a pipeline script)
+
+//This allows us to create our own Docker image for this specific use-case.  Once it is built, it will not be rebuilt, so only adds delay the first time we use it.
+def create_custom_image(image_name, params = "") {
+    // Create a lock to prevent building the same image in parallel
+    lock('IMAGEBUILDLOCK__' + env.NODE_NAME) {
+        def jenkins_username = sh(script: 'whoami', returnStdout: true).trim()
+        def jenkins_uid = sh(script: "id -u  ${jenkins_username}", returnStdout: true).trim()
+        def jenkins_gid = sh(script: "id -g  ${jenkins_username}", returnStdout: true).trim()
+
+        def dockerfile = """
+            FROM ubuntu:20.04
+            ARG DEBIAN_FRONTEND=noninteractive
+            ENV JENKINS_HOME=${env.JENKINS_HOME}
+            ENV HOME=${env.JENKINS_HOME}
+            ENV PIPENV_VENV_IN_PROJECT=true
+            ENV TZ=Europe/London
+            RUN groupadd -g ${jenkins_gid} ${jenkins_username} && useradd -m -u ${jenkins_uid} -g ${jenkins_gid} -s /bin/bash ${jenkins_username}
+            ### Note: use pip to install pipenv (not apt) to avoid pypa/pipenv#2196 (when using PIPENV_VENV_IN_PROJECT)
+            RUN apt-get update \
+                && apt-get install -y git iproute2 \
+                      python3-boto python3-boto3 python3-botocore python3-dev python3-distutils python3-dnspython python3-google-auth python3-googleapi python3-libcloud python3-jinja2 python3-jmespath python3-netaddr python3-paramiko python3-pip python3-ruamel.yaml python3-setuptools python3-wheel python3-xmltodict \
+                && pip3 install pipenv ansible>=5.2.0 \
+                && pip3 install -r \$(pip3 show ansible | grep ^Location | sed 's/Location: \\(.*\\)/\\1/')/ansible_collections/azure/azcollection/requirements-azure.txt
+            """.stripIndent()
+
+        writeFile(file: "Dockerfile", text: dockerfile, encoding: "UTF-8")
+        custom_build = docker.build(image_name, params + "--network host .")
+
+        return (custom_build)
+    }
+}
+
+
+properties([
+        parameters([
+                string(name: 'NEW_VERSION', defaultValue: "", description: "Specify either the version to be created (e.g.: v1.0.0), or 'next' to apply the next patch version."),
+                credentials(name: 'GIT_CREDS', credentialType: 'com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl', defaultValue: 'GITHUB_SVC_USER', description: 'Jenkins username/password credentials for GitHub', required: false),
+                booleanParam(name: 'UPDATE_GALAXY', defaultValue: true, description: 'Tick the box to also update Ansible-Galaxy repo')
+        ])
+])
+
+node {
+    if (params.NEW_VERSION != "") {
+        stage('Setup Environment') {
+            sh 'printenv | sort'
+            echo "Params: $params"
+
+            println("Checkout from SCM, or default if not a pipeline job")
+            try {
+                checkout scm
+            } catch (Exception e) {
+                println("scm not available: " + e.toString() + ", so checking out manually.")
+                checkout([$class: 'GitSCM', branches: [[name: "${PROJECT_BRANCH_DEFAULT}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'WipeWorkspace']], submoduleCfg: [], userRemoteConfigs: [[credentialsId: params.GIT_CREDS ? params.GIT_CREDS : '', url: PROJECT_URL_DEFAULT]]])
+            }
+        }
+
+
+        def docker_parent_net_str = ""
+        if (sh(script: 'grep -sq "docker\\|lxc" /proc/1/cgroup', returnStatus: true) == 0) {
+            println("Running in docker.  Getting network to pass to docker-in-docker containers...")
+            def docker_parent_net_id = sh(script: 'docker inspect  $(basename $(cat /proc/1/cpuset)) -f "{{ range .NetworkSettings.Networks }}{{println .NetworkID}}{{end}}" | head -n 1', returnStdout: true).trim()
+            docker_parent_net_str = "--network ${docker_parent_net_id}"
+            println("docker_parent_net_str: ${docker_parent_net_str}")
+        }
+
+        /*** Create a custom docker image within this Jenkinsfile ***/
+        create_custom_image("ubuntu_ansible", "").inside("--init ${docker_parent_net_str}") {
+            def new_tag_version = params.NEW_VERSION
+            stage('Create new version') {
+                withCredentials([usernamePassword(credentialsId: params.GIT_CREDS, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    def apiUrlReleases = "https://api.github.com/repos/" + PROJECT_URL_DEFAULT.replaceFirst("^(http[s]?://[^/]+/)", "") + "/releases"
+                    def latestReleaseQuery = ["curl", "-s", "-H", "Accept: application/json", "-H", "Content-type: application/json", "-H", "Authorization: token ${GIT_PASS}", "-X", "GET", "${apiUrlReleases}/latest"].execute().text.trim()
+                    def latestRelease = readJSON text: "${latestReleaseQuery}"
+                    if (params.NEW_VERSION == "next") {
+                        String full_ver_str = latestRelease.tag_name ? latestRelease.tag_name : "v0.0.0"
+                        String major_minor = full_ver_str.substring(0, full_ver_str.lastIndexOf('.') + 1)
+                        String patch = full_ver_str.substring(full_ver_str.lastIndexOf('.') + 1)
+                        new_tag_version = "${major_minor}${patch.toInteger() + 1}"
+                    }
+                    String tag_range = latestRelease.tag_name ? "${latestRelease.tag_name}..HEAD" : ""
+                    new_tag_body = sh(returnStdout: true, script: "git log ${tag_range} --pretty=format:'<li>%H - %s</li>'").trim()
+                    if (new_tag_body != "") {
+                        def payload = JsonOutput.toJson(["tag_name": new_tag_version, "name": new_tag_version, "body": new_tag_body])
+                        def _dummyresponse = ["curl", "-s", "-H", "Accept: application/json", "-H", "Content-type: application/json", "-H", "Authorization: token ${GIT_PASS}", "-X", "POST", "-d", payload, apiUrlReleases].execute().text.trim()
+                        echo "${new_tag_version} is now created"
+                    } else {
+                        currentBuild.result = 'ABORTED'
+                        println("No change since last release")
+                    }
+                }
+            }
+
+            if (params.UPDATE_GALAXY == true && currentBuild.result != 'ABORTED') {
+                stage('Update ansible galaxy') {
+                    withCredentials([string(credentialsId: "GALAXY_API_KEY", variable: 'GALAXY_API_KEY')]) {
+                        sh 'sed -E -i "s|^version:.*|version: ' + new_tag_version.replaceFirst(/^\w?(.*)/, '$1') + '|" galaxy.yml'
+                        def galaxyBuildResponse = sh(returnStdout: true, script: "ansible-galaxy collection build").trim()
+                        def galaxyPublishResponse = sh(returnStdout: true, script: "ansible-galaxy collection publish ${galaxyBuildResponse.split(' ').last()} --api-key ${GALAXY_API_KEY} 2>&1 || true").trim()
+                        println("galaxyPublishResponse: " + galaxyPublishResponse)
+                        if (galaxyPublishResponse.contains("ERROR!")) {
+                            if (galaxyPublishResponse.contains("already exists")) {
+                                currentBuild.result = 'ABORTED'
+                            } else {
+                                currentBuild.result = 'FAILURE'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        error "NEW_VERSION parameter not specified.  Specify either the version to be created (e.g.: v1.0.0), or 'next' to apply the next patch version."
+    }
+}
