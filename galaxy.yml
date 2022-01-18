@@ -9,7 +9,7 @@ readme: README.md
 authors:
 - Dougal Seeley <github@dougalseeley.com>
 
-description: This plugin can be used to create new ESXi virtual machines, including cloning from templates or other virtual machines.
+description: These Ansible modules get the info from, or create (or clone), ESXi virtual machines. They use direct SOAP calls and Paramiko SSH, to allow usage on the free hypervisor.
 
 #license:
 #- BSD-3-Clause

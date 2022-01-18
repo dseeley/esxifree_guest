@@ -1,6 +1,6 @@
 # Ansible Collection - dseeley.esxifree_guest
 
-This plugin can be used to create new ESXi virtual machines, including cloning from templates or other virtual machines. 
+These modules can be used to get the info from, and create new ESXi virtual machines, including cloning from templates or other virtual machines. 
 
 It does so using direct SOAP calls and Paramiko SSH to the host - without using the vSphere API - meaning it can be used on the free hypervisor.
 
