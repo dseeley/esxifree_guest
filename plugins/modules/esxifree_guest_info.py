@@ -169,7 +169,7 @@ class esxiFreeScraper(object):
     def get_vm_info(self, name=None, moid=None, filters=None):
         if moid:
             response, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>true</all></propSet><objectSet><obj type="VirtualMachine">' + str(moid) + '</obj><skip>false</skip></objectSet></specSet><options/></RetrievePropertiesEx>')
-            xmltodictresponse = xmltodict.parse(response.read())
+            xmltodictresponse = xmltodict.parse(response.read(), force_list=({'objects', 'propSet'}))
             return (self.parse_vm(xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']))
         elif name:
             virtual_machines = self.get_all_vm_info(filters)
@@ -177,7 +177,7 @@ class esxiFreeScraper(object):
 
     def get_all_vm_info(self, filters=None):
         response, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>false</all><pathSet>name</pathSet><pathSet>config</pathSet><pathSet>configStatus</pathSet><pathSet>datastore</pathSet><pathSet>guest</pathSet><pathSet>layout</pathSet><pathSet>layoutEx</pathSet><pathSet>runtime</pathSet></propSet><objectSet><obj type="Folder">ha-folder-vm</obj><selectSet xsi:type="TraversalSpec"><name>traverseChild</name><type>Folder</type><path>childEntity</path> <selectSet><name>traverseChild</name></selectSet><selectSet xsi:type="TraversalSpec"><type>Datacenter</type><path>vmFolder</path><selectSet><name>traverseChild</name></selectSet> </selectSet> </selectSet> </objectSet></specSet><options type="RetrieveOptions"></options></RetrievePropertiesEx>')
-        xmltodictresponse = xmltodict.parse(response.read())
+        xmltodictresponse = xmltodict.parse(response.read(), force_list=({'objects', 'propSet'}))
 
         virtual_machines = []
         for vm_instance in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']:
@@ -269,10 +269,10 @@ def main():
         module = cDummyAnsibleModule()
         ## Update VM
         module.params = {
-            "hostname": "192.168.1.3",
-            "username": "svc",
+            "hostname": "192.168.1.30",
+            "username": "root",
             "password": sys.argv[2],
-            "filters": {"hw_name": "gold-*"},
+            "filters": {"hw_name": "gold-ubuntu2204-*"},
             "name": None,  # "parsnip-prod-sys-a0-1616868999",
             "moid": None  # 350
         }

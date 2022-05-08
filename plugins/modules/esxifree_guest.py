@@ -554,8 +554,8 @@ class esxiFreeScraper(object):
 
     def get_vm(self, name=None, moid=None):
         response, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>false</all><pathSet>name</pathSet></propSet><objectSet><obj type="Folder">ha-folder-vm</obj><selectSet xsi:type="TraversalSpec"><name>traverseChild</name><type>Folder</type><path>childEntity</path> <selectSet><name>traverseChild</name></selectSet><selectSet xsi:type="TraversalSpec"><type>Datacenter</type><path>vmFolder</path><selectSet><name>traverseChild</name></selectSet> </selectSet> </selectSet> </objectSet></specSet><options type="RetrieveOptions"></options></RetrievePropertiesEx>')
-        xmltodictresponse = xmltodict.parse(response.read())
-        allVms = [{'moid': a['obj']['#text'], 'name': a['propSet']['val']['#text']} for a in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']]
+        xmltodictresponse = xmltodict.parse(response.read(), force_list=({'objects', 'propSet'}))
+        allVms = [{'moid': a['obj']['#text'], 'name': a['propSet'][0]['val']['#text']} for a in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']]
         for vm in allVms:
             if ((name and name == vm['name']) or (moid and moid == vm['moid'])):
                 return vm['name'], vm['moid']
@@ -640,6 +640,8 @@ class esxiFreeScraper(object):
                     vmxDict.update({"mem.hotadd": template_vmxDict['mem.hotadd']})
                 if 'sched.mem.pin' in template_vmxDict:
                     vmxDict.update({"sched.mem.pin": template_vmxDict['sched.mem.pin']})
+                if 'firmware' in template_vmxDict:
+                    vmxDict.update({"firmware": template_vmxDict['firmware']})
 
                 # Network settings
                 netCount = 0
@@ -910,13 +912,13 @@ def main():
         module = cDummyAnsibleModule()
         ## Update VM
         module.params = {
-            "hostname": "192.168.1.3",
-            "username": "svc",
+            "hostname": "192.168.1.30",
+            "username": "root",
             "password": sys.argv[2],
             # "annotation": "{'Name': 'dougal-test-dev-sysdisks2-a0-1617548508', 'hosttype': 'sysdisks2', 'env': 'dev', 'cluster_name': 'dougal-test-dev', 'owner': 'dougal', 'cluster_suffix': '1617548508', 'lifecycle_state': 'retiring', 'maintenance_mode': 'false'}",
             "annotation": None,
             "disks": None,
-            "name": "cvtest-16-dd9032f65aef7-dev-sys-b0-1617726990",
+            "name": "test",
             "moid": None,
             "state": "unchanged",
             "wait_timeout": 180
