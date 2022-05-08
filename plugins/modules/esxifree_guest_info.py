@@ -94,7 +94,14 @@ import json
 import re
 import sys
 import time
-import xmltodict
+
+try:
+    from lxml import etree
+    LXML_IMPORT_ERR = None
+    parser = etree.XMLParser(ns_clean=True)
+
+except ImportError as lxml_import_exception:
+    LXML_IMPORT_ERR = lxml_import_exception
 
 # For the soap client
 try:
@@ -109,6 +116,17 @@ except ImportError:
     from httplib import HTTPResponse
 import ssl
 
+try:
+    from ansible.module_utils.basic import missing_required_lib
+except:
+    def missing_required_lib(library, reason=None, url=None):
+        msg = "Failed to import the required Python library (%s) on Python %s." % (library, sys.executable)
+        if reason:
+            msg += " This is required %s." % reason
+        if url:
+            msg += " See %s for more info." % url
+
+        return msg
 
 try:
     from ansible.module_utils.basic import AnsibleModule
@@ -119,8 +137,8 @@ except:
             self.params={}
         def exit_json(self, changed, **kwargs):
             print(changed, json.dumps(kwargs, sort_keys=True, indent=4, separators=(',', ': ')))
-        def fail_json(self, msg):
-            print("Failed: " + msg)
+        def fail_json(self, msg, exception=None):
+            print("Failed: " + msg + str(exception))
             exit(1)
 
 
@@ -129,11 +147,13 @@ class vmw_soap_client(object):
     def __init__(self, host, username, password):
         self.vmware_soap_session_cookie = None
         self.host = host
-        response, cookies = self.send_req("<RetrieveServiceContent><_this>ServiceInstance</_this></RetrieveServiceContent>")
-        xmltodictresponse = xmltodict.parse(response.read())
-        sessionManager_name = xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrieveServiceContentResponse']['returnval']['sessionManager']['#text']
+        response_fp, cookies = self.send_req("<RetrieveServiceContent><_this>ServiceInstance</_this></RetrieveServiceContent>")
+        response = response_fp.read()
+        xml_etree = etree.fromstring(response.decode().replace('\n','').replace('xmlns="urn:vim25"', '').encode())
 
-        response, cookies = self.send_req("<Login><_this>" + sessionManager_name + "</_this><userName>" + username + "</userName><password>" + password + "</password></Login>")
+        sessionManager_name = str(xml_etree.xpath("/soapenv:Envelope/soapenv:Body/RetrieveServiceContentResponse/returnval/sessionManager/text()", namespaces=xml_etree.nsmap)[0])
+
+        response_fp, cookies = self.send_req("<Login><_this>" + sessionManager_name + "</_this><userName>" + username + "</userName><password>" + password + "</password></Login>")
         self.vmware_soap_session_cookie = cookies['vmware_soap_session'].value
 
     def send_req(self, envelope_body=None):
@@ -168,19 +188,21 @@ class esxiFreeScraper(object):
 
     def get_vm_info(self, name=None, moid=None, filters=None):
         if moid:
-            response, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>true</all></propSet><objectSet><obj type="VirtualMachine">' + str(moid) + '</obj><skip>false</skip></objectSet></specSet><options/></RetrievePropertiesEx>')
-            xmltodictresponse = xmltodict.parse(response.read())
-            return (self.parse_vm(xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']))
+            response_fp, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>true</all></propSet><objectSet><obj type="VirtualMachine">' + str(moid) + '</obj><skip>false</skip></objectSet></specSet><options/></RetrievePropertiesEx>')
+            response = response_fp.read()
+            xml_etree = etree.fromstring(response.decode().replace('\n','').replace('xmlns="urn:vim25"', '').encode())
+            return (self.parse_vm(xml_etree.xpath("/soapenv:Envelope/soapenv:Body/RetrievePropertiesExResponse/returnval/objects", namespaces=xml_etree.nsmap)))
         elif name:
             virtual_machines = self.get_all_vm_info(filters)
             return ([vm for vm in virtual_machines if vm['hw_name'] == name][0])
 
     def get_all_vm_info(self, filters=None):
-        response, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>false</all><pathSet>name</pathSet><pathSet>config</pathSet><pathSet>configStatus</pathSet><pathSet>datastore</pathSet><pathSet>guest</pathSet><pathSet>layout</pathSet><pathSet>layoutEx</pathSet><pathSet>runtime</pathSet></propSet><objectSet><obj type="Folder">ha-folder-vm</obj><selectSet xsi:type="TraversalSpec"><name>traverseChild</name><type>Folder</type><path>childEntity</path> <selectSet><name>traverseChild</name></selectSet><selectSet xsi:type="TraversalSpec"><type>Datacenter</type><path>vmFolder</path><selectSet><name>traverseChild</name></selectSet> </selectSet> </selectSet> </objectSet></specSet><options type="RetrieveOptions"></options></RetrievePropertiesEx>')
-        xmltodictresponse = xmltodict.parse(response.read())
+        response_fp, cookies = self.soap_client.send_req('<RetrievePropertiesEx><_this type="PropertyCollector">ha-property-collector</_this><specSet><propSet><type>VirtualMachine</type><all>false</all><pathSet>name</pathSet><pathSet>config</pathSet><pathSet>configStatus</pathSet><pathSet>datastore</pathSet><pathSet>guest</pathSet><pathSet>layout</pathSet><pathSet>layoutEx</pathSet><pathSet>runtime</pathSet></propSet><objectSet><obj type="Folder">ha-folder-vm</obj><selectSet xsi:type="TraversalSpec"><name>traverseChild</name><type>Folder</type><path>childEntity</path> <selectSet><name>traverseChild</name></selectSet><selectSet xsi:type="TraversalSpec"><type>Datacenter</type><path>vmFolder</path><selectSet><name>traverseChild</name></selectSet> </selectSet> </selectSet> </objectSet></specSet><options type="RetrieveOptions"></options></RetrievePropertiesEx>')
+        response = response_fp.read()
+        xml_etree = etree.fromstring(response.decode().replace('\n','').replace('xmlns="urn:vim25"', '').encode())
 
         virtual_machines = []
-        for vm_instance in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']:
+        for vm_instance in self.parse_vm(xml_etree.xpath("/soapenv:Envelope/soapenv:Body/RetrievePropertiesExResponse/returnval/objects", namespaces=xml_etree.nsmap)[0]):
             virtual_machines.append(self.parse_vm(vm_instance))
 
         # Sort the VMs in order of moid (which is also chronological)
@@ -199,7 +221,7 @@ class esxiFreeScraper(object):
         return inDict
 
     def parse_vm(self, vmObj):
-        configObj = [propSetObj for propSetObj in vmObj['propSet'] if propSetObj['name'] == 'config'][0]['val']
+        configObj = vmObj.xpath("/objects/propSet[name='config']/val", namespaces=vmObj.nsmap)
         runtimeObj = [propSetObj for propSetObj in vmObj['propSet'] if propSetObj['name'] == 'runtime'][0]['val']
         guestObj = [propSetObj for propSetObj in vmObj['propSet'] if propSetObj['name'] == 'guest'][0]['val']
         layoutExObj = [propSetObj for propSetObj in vmObj['propSet'] if propSetObj['name'] == 'layoutEx'][0]['val']
@@ -269,13 +291,16 @@ def main():
         module = cDummyAnsibleModule()
         ## Update VM
         module.params = {
-            "hostname": "192.168.1.3",
-            "username": "svc",
+            "hostname": "192.168.1.30",
+            "username": "root",
             "password": sys.argv[2],
-            "filters": {"hw_name": "gold-*"},
+            "filters": {"hw_name": "gold-ubunutu2204-*"},
             "name": None,  # "parsnip-prod-sys-a0-1616868999",
             "moid": None  # 350
         }
+
+    if LXML_IMPORT_ERR:
+        module.fail_json(msg=missing_required_lib("lxml"), exception=LXML_IMPORT_ERR)
 
     iScraper = esxiFreeScraper(hostname=module.params['hostname'], username=module.params['username'], password=module.params['password'])
 
