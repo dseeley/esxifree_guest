@@ -1,7 +1,10 @@
 #!groovy
 
+def pypi_ansible = ["curl", "-s", "-H", "Accept: application/json", "-H", "Content-type: application/json", "GET", "https://pypi.org/pypi/ansible/json"].execute().text
+def pypi_ansible_latest = new groovy.json.JsonSlurper().parseText(pypi_ansible).releases.keySet()[-1]
+
 node {
     stage('Call ansible/esxifree_guest-release-tag') {
-        build job: 'ansible/esxifree_guest-release-tag', parameters: [string(name: 'NEW_VERSION', value: "next")]
+        build job: 'ansible/esxifree_guest-release-tag', parameters: [string(name: 'NEW_VERSION', value: "next"), string(name: 'ANSIBLE_VERSION', value: pypi_ansible_latest)]
     }
 }
