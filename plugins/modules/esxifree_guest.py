@@ -154,7 +154,7 @@ options:
         description:
         - Indicates that this is a boot disk. 
         required: false
-        default: no
+        default: false
         type: bool
       size_gb:
         description:  Specifies the size of the disk in base-2 GB.
@@ -247,8 +247,8 @@ options:
 
 '''
 EXAMPLES = r'''
-- name: Create a virtual machine
-  esxifree_guest:
+- name: Create a virtual machine (no clone/template)
+  dseeley.esxifree_guest.esxifree_guest:
     hostname: "192.168.1.3"
     username: "svc"
     password: "my_passsword"
@@ -256,7 +256,7 @@ EXAMPLES = r'''
     name: "test_asdf"
     state: present
     guest_id: ubuntu-64
-    hardware: {"version": "15", "num_cpus": "2", "memory_mb": "2048"}
+    hardware: {"version": "21", "num_cpus": "2", "memory_mb": "2048"}
     cloudinit_userdata:
       - name: dougal
         primary_group: dougal
@@ -286,7 +286,7 @@ EXAMPLES = r'''
   delegate_to: localhost
 
 - name: Clone a virtual machine
-  esxifree_guest:
+  dseeley.esxifree_guest.esxifree_guest:
     hostname: "192.168.1.3"
     username: "svc"
     password: "my_passsword"
@@ -295,7 +295,7 @@ EXAMPLES = r'''
     name: "test_asdf"
     state: present
     guest_id: ubuntu-64
-    hardware: {"version": "15", "num_cpus": "2", "memory_mb": "2048"}
+    hardware: {"version": "21", "num_cpus": "2", "memory_mb": "2048"}
     cloudinit_userdata:
       - default
       - name: dougal
@@ -323,7 +323,7 @@ EXAMPLES = r'''
   delegate_to: localhost
 
 - name: Delete a virtual machine
-  esxifree_guest:
+  dseeley.esxifree_guest.esxifree_guest:
     hostname: "{{ esxi_ip }}"
     username: "{{ username }}"
     password: "{{ password }}"
@@ -895,7 +895,7 @@ def main():
         "datastore": {"type": "str"},
         "annotation": {"type": "str", "default": ""},
         "guest_id": {"type": "str", "default": "ubuntu-64"},
-        "hardware": {"type": "dict", "default": {"version": "15", "num_cpus": "2", "memory_mb": "2048", "num_cpu_cores_per_socket": "1", "hotadd_cpu": "False", "hotadd_memory": "False", "memory_reservation_lock": "False"}},
+        "hardware": {"type": "dict", "default": {"version": "21", "num_cpus": "2", "memory_mb": "2048", "num_cpu_cores_per_socket": "1", "hotadd_cpu": "False", "hotadd_memory": "False", "memory_reservation_lock": "False"}},
         "cloudinit_userdata": {"type": "dict", "default": {}},
         "disks": {"type": "list", "default": [{"boot": True, "size_gb": 16, "type": "thin"}]},
         "cdrom": {"type": "dict", "default": {"type": "client"}},
@@ -951,7 +951,7 @@ def main():
         #     "delete_cloudinit": False,
         #     "force": False,
         #     "guest_id": "ubuntu-64",
-        #     "hardware": {"memory_mb": "2048", "num_cpus": "2", "version": "15"},
+        #     "hardware": {"memory_mb": "2048", "num_cpus": "2", "version": "21"},
         #     "moid": None,
         #     "name": "dougal-test-dev-sys-a0-new",
         #     "networks": [{"cloudinit_netplan": {"ethernets": {"eth0": {"dhcp4": True}}}, "networkName": "VM Network", "virtualDev": "vmxnet3"}],
@@ -975,7 +975,7 @@ def main():
         #     "template": None,
         #     "state": "present",
         #     "guest_id": "ubuntu-64",
-        #     "hardware": {"version": "15", "num_cpus": "2", "memory_mb": "2048"},
+        #     "hardware": {"version": "21", "num_cpus": "2", "memory_mb": "2048"},
         #     "cloudinit_userdata": [],
         #     "disks": [{"boot": True, "size_gb": 16, "type": "thin"}, {"size_gb": 5, "type": "thin"}, {"size_gb": 2, "type": "thin"}],
         #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.2-server-amd64.iso"},
@@ -1091,12 +1091,12 @@ def main():
             if module.params['template'] is not None:
                 iScraperTemplate = esxiFreeScraper(hostname=module.params['hostname'], username=module.params['username'], password=module.params['password'], name=module.params['template'], moid=None)
                 (stdin, stdout, stderr) = iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(iScraperTemplate.moid))
-                if re.search('Powered off', stdout.read().decode('UTF-8')) is not None:
-                    createVmResult = iScraper.create_vm(module.params['template'], module.params['annotation'], module.params['datastore'], module.params['hardware'], module.params['guest_id'], module.params['disks'], module.params['cdrom'], module.params['customvalues'], module.params['networks'], module.params['cloudinit_userdata'])
-                    if createVmResult != None:
-                        module.fail_json(msg="Failed to create_vm: %s" % createVmResult)
-                else:
+                if re.search('Powered off', stdout.read().decode('UTF-8')) is None:
                     module.fail_json(msg="Template VM must be powered off before cloning")
+
+            createVmResult = iScraper.create_vm(module.params['template'], module.params['annotation'], module.params['datastore'], module.params['hardware'], module.params['guest_id'], module.params['disks'], module.params['cdrom'], module.params['customvalues'], module.params['networks'], module.params['cloudinit_userdata'])
+            if createVmResult != None:
+                module.fail_json(msg="Failed to create_vm: %s" % createVmResult)
 
         else:
             updateVmResult = iScraper.update_vm(annotation=module.params['annotation'], disks=module.params['disks'])
