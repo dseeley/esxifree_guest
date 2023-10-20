@@ -26,7 +26,7 @@ requirements:
 - paramiko
 - xmltodict
 notes:
-  - Tested on ESXi 7.0u2
+- Tested on ESXi 7.0u2 and 8.0
 options:
   hostname:
     description:
@@ -46,19 +46,14 @@ options:
   state:
     description:
     - Specify the state the virtual machine should be in.
-    - 'If C(state) is set to C(present) and virtual machine exists, ensure the virtual machine
-       configurations conforms to task arguments.'
-    - 'If C(state) is set to C(absent) and virtual machine exists, then the specified virtual machine
-      is removed with its associated components.'
-    - 'If C(state) is set to one of the following C(poweredon), C(poweredoff), C(present)
-      and virtual machine does not exists, then virtual machine is deployed with given parameters.'
-    - 'If C(state) is set to C(poweredon) and virtual machine exists with powerstate other than powered on,
-      then the specified virtual machine is powered on.'
-    - 'If C(state) is set to C(poweredoff) and virtual machine exists with powerstate other than powered off,
-      then the specified virtual machine is powered off.'
-    - 'If C(state) is set to C(shutdownguest) and virtual machine exists, then the virtual machine is shutdown.'
-    - 'If C(state) is set to C(rebootguest) and virtual machine exists, then the virtual machine is rebooted.'
-    - 'If C(state) is set to C(unchanged) the state of the VM will not change (if it's on/off, it will stay so).  Used for updating annotations.'
+    - If C(state) is set to C(present) and virtual machine exists, ensure the virtual machine configurations conforms to task arguments.
+    - If C(state) is set to C(absent) and virtual machine exists, then the specified virtual machine is removed with its associated components.
+    - If C(state) is set to one of the following C(poweredon), C(poweredoff), C(present) and virtual machine does not exists, then virtual machine is deployed with given parameters.
+    - If C(state) is set to C(poweredon) and virtual machine exists with powerstate other than powered on, then the specified virtual machine is powered on.
+    - If C(state) is set to C(poweredoff) and virtual machine exists with powerstate other than powered off, then the specified virtual machine is powered off.
+    - If C(state) is set to C(shutdownguest) and virtual machine exists, then the virtual machine is shutdown.
+    - If C(state) is set to C(rebootguest) and virtual machine exists, then the virtual machine is rebooted.
+    - If C(state) is set to C(unchanged) the state of the VM will not change (if it's on/off, it will stay so).  Used for updating annotations.
     choices: [ present, absent, poweredon, poweredoff, shutdownguest, rebootguest, unchanged ]
     default: present
   name:
@@ -132,7 +127,7 @@ options:
     description:
     - Set the guest ID.
     - This parameter is case sensitive.
-    - 'Examples:'
+    - Examples:
     - "  virtual machine with RHEL7 64 bit, will be 'rhel7-64'"
     - "  virtual machine with CentOS 7 (64-bit), will be 'centos7-64'"
     - "  virtual machine with Debian 9 (Stretch) 64 bit, will be 'debian9-64'"
@@ -182,17 +177,16 @@ options:
             description:
             - The source file, e.g. "[datastore1] linux_dev/linux_dev--webdata.vmdk"
             type: str
-          copy_or_move
+          copy_or_move:
             description:
             - Whether to copy (clone) from the source datastore, or move the file.  Move will fail if source and destination datastore differ.  
             choices: [copy, move]
-
   cdrom:
     description:
     - A CD-ROM configuration for the virtual machine.
-    - 'Valid attributes are:'
-    - ' - C(type) (string): The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.'
-    - ' - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).'
+    - Valid attributes are:
+    -  - C(type) (string): The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.
+    -  - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).
   wait:
     description:
     - On creation, wait for the instance to obtain its IP address before returning.
@@ -232,11 +226,11 @@ options:
     - A list of networks (in the order of the NICs).
     - Removing NICs is not allowed, while reconfiguring the virtual machine.
     - All parameters and VMware object names are case sensetive.
-    - 'One of the below parameters is required per entry:'
-    - ' - C(networkName) (string): Name of the portgroup for this interface.
-    - ' - C(virtualDev) (string): Virtual network device (one of C(e1000e), C(vmxnet3) (default), C(sriov)).'
-    - 'Optional parameters per entry (used for OS customization):'
-    - ' - C(cloudinit_ethernets) (dict): A list of C(ethernets) within the definition of C(Networking Config Version 2)
+    - One of the below parameters is required per entry:
+    -  - C(networkName) (string): Name of the portgroup for this interface.
+    -  - C(virtualDev) (string): Virtual network device (one of C(e1000e), C(vmxnet3) (default), C(sriov)).
+    - Optional parameters per entry (used for OS customization):
+    -  - C(cloudinit_ethernets) (dict): A list of C(ethernets) within the definition of C(Networking Config Version 2)
           defined in U(https://cloudinit.readthedocs.io/en/latest/topics/network-config-format-v2.html)'.  The 
           VM must already have cloud-init-vmware-guestinfo installed U(https://github.com/vmware/cloud-init-vmware-guestinfo)
   datastore:
@@ -244,8 +238,8 @@ options:
     - Specify datastore or datastore cluster to provision virtual machine.
     type: str
     required: true
-
 '''
+
 EXAMPLES = r'''
 - name: Create a virtual machine (no clone/template)
   dseeley.esxifree_guest.esxifree_guest:
