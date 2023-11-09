@@ -180,14 +180,17 @@ class esxiFreeScraper(object):
         xmltodictresponse = xmltodict.parse(response.read(), force_list=({'objects', 'propSet'}))
 
         virtual_machines = []
-        for vm_instance in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']:
-            virtual_machines.append(self.parse_vm(vm_instance))
+        if 'returnval' in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']:
+            for vm_instance in xmltodictresponse['soapenv:Envelope']['soapenv:Body']['RetrievePropertiesExResponse']['returnval']['objects']:
+                virtual_machines.append(self.parse_vm(vm_instance))
 
-        # Sort the VMs in order of moid (which is also chronological)
-        virtual_machines.sort(key=lambda vm: int(vm['moid']))
+            # Sort the VMs in order of moid (which is also chronological)
+            virtual_machines.sort(key=lambda vm: int(vm['moid']))
 
-        if filters and 'hw_name' in filters:
-            return ([vm for vm in virtual_machines if re.search(filters['hw_name'], vm['hw_name'])])
+            if filters and 'hw_name' in filters:
+                return ([vm for vm in virtual_machines if re.search(filters['hw_name'], vm['hw_name'])])
+            else:
+                return (virtual_machines)
         else:
             return (virtual_machines)
 
