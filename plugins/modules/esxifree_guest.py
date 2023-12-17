@@ -183,10 +183,21 @@ options:
             choices: [copy, move]
   cdrom:
     description:
+    - A list of cdrom to add.
     - A CD-ROM configuration for the virtual machine.
-    - Valid attributes are:
-    -  - C(type) (string): The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.
-    -  - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).
+    required: false
+    type: list
+    suboptions:
+      type:
+        description:
+        - The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.
+        required: true
+        type: str
+      iso_path:
+        description:
+        - The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).
+        required: false
+        type: str
   wait:
     description:
     - On creation, wait for the instance to obtain its IP address before returning.
@@ -265,7 +276,8 @@ EXAMPLES = r'''
      - {"boot": true, "size_gb": 16, "type": "thin"}
      - {"size_gb": 2, "type": "thin", "volname": "test_new"}
      - {"size_gb": 1, "type": "thin", "volname": "test_clone", "src": {"backing_filename": "[datastore1] linux_dev/linux_dev--webdata.vmdk", "copy_or_move": "copy"}}],
-    cdrom: {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.4-server-amd64.iso"},
+    cdrom: 
+     - {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.4-server-amd64.iso"}
     networks:
       - networkName: VM Network
         virtualDev: vmxnet3
@@ -714,18 +726,20 @@ class esxiFreeScraper(object):
             vmxDict.update({"sched.mem.minSize": hardware['memory_mb']})
 
         # CDROM settings
-        if cdrom['type'] == 'client':
-            (stdin, stdout, stderr) = self.esxiCnx.exec_command("find /vmfs/devices/cdrom/ -mindepth 1 ! -type l")
-            cdrom_dev = stdout.read().decode('UTF-8').lstrip("\r\n").rstrip(" \r\n")
-            vmxDict.update({"ide0:0.devicetype": "atapi-cdrom"})
-            vmxDict.update({"ide0:0.filename": cdrom_dev})
-            vmxDict.update({"ide0:0.present": "TRUE"})
-        elif cdrom['type'] == 'iso':
-            if 'iso_path' in cdrom:
-                vmxDict.update({"ide0:0.devicetype": "cdrom-image"})
-                vmxDict.update({"ide0:0.filename": cdrom['iso_path']})
-                vmxDict.update({"ide0:0.present": "TRUE"})
-                vmxDict.update({"ide0:0.startconnected": "TRUE"})
+        if cdrom:
+            for newCDRomIdx, newCDRom in enumerate(cdrom):
+                if newCDRom['type'] == 'client':
+                    (stdin, stdout, stderr) = self.esxiCnx.exec_command("find /vmfs/devices/cdrom/ -mindepth 1 ! -type l")
+                    cdrom_dev = stdout.read().decode('UTF-8').lstrip("\r\n").rstrip(" \r\n")
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".devicetype": "atapi-cdrom"})
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".filename": cdrom_dev})
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".present": "TRUE"})
+                elif newCDRom['type'] == 'iso':
+                    if 'iso_path' in newCDRom:
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".devicetype": "cdrom-image"})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".filename": newCDRom['iso_path']})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".present": "TRUE"})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".startconnected": "TRUE"})
 
         # Network settings
         cloudinit_nets = {"version": 2}
@@ -904,7 +918,7 @@ def main():
         "hardware": {"type": "dict", "default": {"version": "21", "num_cpus": "2", "memory_mb": "2048", "num_cpu_cores_per_socket": "1", "hotadd_cpu": "False", "hotadd_memory": "False", "memory_reservation_lock": "False"}},
         "cloudinit_userdata": {"type": "dict", "default": {}},
         "disks": {"type": "list", "default": [{"boot": True, "size_gb": 16, "type": "thin"}]},
-        "cdrom": {"type": "dict", "default": {"type": "client"}},
+        "cdrom": {"type": "list", "default": []},
         "networks": {"type": "list", "default": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}]},
         "customvalues": {"type": "list", "default": []},
         "wait": {"type": "bool", "default": True},
@@ -951,7 +965,7 @@ def main():
         #     "password": sys.argv[2],
         #     "annotation": None,
         #     # "annotation": "{'lifecycle_state': 'current', 'Name': 'test-prod-sys-a0-1589979249', 'cluster_suffix': '1589979249', 'hosttype': 'sys', 'cluster_name': 'test-prod', 'env': 'prod', 'owner': 'dougal'}",
-        #     "cdrom": {"type": "client"},
+        #     "cdrom": [{"type": "client"}],
         #     "cloudinit_userdata": [],
         #     "customvalues": [],
         #     "datastore": "4tb-evo860-ssd",
@@ -988,7 +1002,7 @@ def main():
         #     "hardware": {"version": "21", "num_cpus": "2", "memory_mb": "2048"},
         #     "cloudinit_userdata": [],
         #     "disks": [{"boot": True, "size_gb": 16, "type": "thin"}, {"size_gb": 5, "type": "thin"}, {"size_gb": 2, "type": "thin"}],
-        #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.2-server-amd64.iso"},
+        #     "cdrom": [{"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.2-server-amd64.iso"}],
         #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}],
         #     "customvalues": [],
         #     "wait": True,

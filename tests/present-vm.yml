@@ -23,7 +23,10 @@ disks:
       copy_or_move: "copy"
       extend: true
 cdrom:
-  type: iso
+  - type: iso
+    iso_path: "/vmfs/volumes/datastore1/ubuntu-22.04.3-live-server-amd64.iso"
+  - type: iso
+    iso_path: "/vmfs/volumes/datastore1/ubuntu-cloudinit.iso"
 networks:
   - networkName: VM Network
     virtualDev: vmxnet3
