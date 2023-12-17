@@ -906,19 +906,23 @@ def main():
     else:
         # For testing without Ansible (e.g on Windows)
         module = cDummyAnsibleModule()
-        ## Update VM
-        module.params = {
-            "hostname": "192.168.1.30",
-            "username": "root",
-            "password": sys.argv[2],
-            # "annotation": "{'Name': 'dougal-test-dev-sysdisks2-a0-1617548508', 'hosttype': 'sysdisks2', 'env': 'dev', 'cluster_name': 'dougal-test-dev', 'owner': 'dougal', 'cluster_suffix': '1617548508', 'lifecycle_state': 'retiring', 'maintenance_mode': 'false'}",
-            "annotation": None,
-            "disks": None,
-            "name": "test",
-            "moid": None,
-            "state": "unchanged",
-            "wait_timeout": 180
-        }
+
+        with open(sys.argv[2], 'r') as file:
+            module.params = yaml.safe_load(file)
+
+        # ## Update VM
+        # module.params = {
+        #     "hostname": "192.168.1.30",
+        #     "username": "root",
+        #     "password": sys.argv[2],
+        #     # "annotation": "{'Name': 'dougal-test-dev-sysdisks2-a0-1617548508', 'hosttype': 'sysdisks2', 'env': 'dev', 'cluster_name': 'dougal-test-dev', 'owner': 'dougal', 'cluster_suffix': '1617548508', 'lifecycle_state': 'retiring', 'maintenance_mode': 'false'}",
+        #     "annotation": None,
+        #     "disks": None,
+        #     "name": "test",
+        #     "moid": None,
+        #     "state": "unchanged",
+        #     "wait_timeout": 180
+        # }
 
         # ## Delete VM
         # module.params = {
