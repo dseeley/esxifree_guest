@@ -374,15 +374,17 @@ else:
 try:
     from ansible.module_utils.basic import AnsibleModule
 except:
-    # For testing without Ansible (e.g on Windows)
-    class cDummyAnsibleModule():
-        def __init__(self):
-            self.params={}
-        def exit_json(self, changed, **kwargs):
-            print(changed, json.dumps(kwargs, sort_keys=True, indent=4, separators=(',', ': ')))
-        def fail_json(self, msg):
-            print("Failed: " + msg)
-            exit(1)
+    pass
+
+# For testing without Ansible (e.g on Windows)
+class cDummyAnsibleModule():
+    def __init__(self):
+        self.params={}
+    def exit_json(self, changed, **kwargs):
+        print(changed, json.dumps(kwargs, sort_keys=True, indent=4, separators=(',', ': ')))
+    def fail_json(self, msg):
+        print("Failed: " + msg)
+        exit(1)
 
 # Executes soap requests on the remote host.
 class vmw_soap_client(object):
