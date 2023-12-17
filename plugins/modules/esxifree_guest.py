@@ -1067,7 +1067,7 @@ def main():
             (stdin, stdout, stderr) = iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(iScraper.moid))
             if re.search('Powered off', stdout.read().decode('UTF-8')) is not None:
                 response, cookies = iScraper.soap_client.send_req('<PowerOnVM_Task><_this type="VirtualMachine">' + str(iScraper.moid) + '</_this></PowerOnVM_Task>')
-                if iScraper.soap_client.wait_for_task(xmltodict.parse(response.read())['soapenv:Envelope']['soapenv:Body']['PowerOffVM_TaskResponse']['returnval']['#text'], int(module.params['wait_timeout'])) != 'success':
+                if iScraper.soap_client.wait_for_task(xmltodict.parse(response.read())['soapenv:Envelope']['soapenv:Body']['PowerOnVM_TaskResponse']['returnval']['#text'], int(module.params['wait_timeout'])) != 'success':
                     module.fail_json(msg="Failed to PowerOnVM_Task")
             else:
                 response, cookies = iScraper.soap_client.send_req('<RebootGuest><_this type="VirtualMachine">' + str(iScraper.moid) + '</_this></RebootGuest>')
