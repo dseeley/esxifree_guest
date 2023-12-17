@@ -140,7 +140,7 @@ options:
   disks:
     description:
     - A list of disks to add (or create via cloning).
-    - Resizing disks is not supported.
+    - Support resizing disks after added.
     - Removing existing disks of the virtual machine is not supported.
     required: false
     type: list
@@ -832,6 +832,10 @@ class esxiFreeScraper(object):
                                 self.esxiCnx.exec_command("vmkfstools -i /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " -d thin " + os.path.dirname(vmxPath) + "/" + disk_filename)
                             else:
                                 self.esxiCnx.exec_command("vmkfstools -E /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " " + os.path.dirname(vmxPath) + "/" + disk_filename)
+
+                            # extend(resize) the disk
+                            if 'extend' in newDisk['src']:
+                                self.esxiCnx.exec_command("vmkfstools -X " + str(newDisk['size_gb']) + "G " + os.path.dirname(vmxPath) + "/" + disk_filename)
 
                     else:
                         (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(newDisk['size_gb']) + "G -d " + newDisk['type'] + " " + os.path.dirname(vmxPath) + "/" + disk_filename)
