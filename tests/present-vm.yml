@@ -15,14 +15,9 @@ hardware:
   num_cpus: 2
   memory_mb: 4096
 disks:
-  # NOT support use `boot` and `src` same time, so it must be removed manually
-  - size_gb: 1
-    type: "thin"
-    volname: "boot"
-    boot: true
   - size_gb: 20
     type: "thin"
-    volname: "cloudimg"
+    boot: true
     src:
       backing_filename: "[datastore1] /jammy-server-cloudimg-amd64.vmdk"
       copy_or_move: "copy"

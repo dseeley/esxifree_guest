@@ -775,7 +775,8 @@ class esxiFreeScraper(object):
         if "scsi0:0.filename" not in vmxDict:
             if len(bootDisks) == 1:
                 disk_filename = self.name + "--boot.vmdk"
-                (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(bootDisks[0]['size_gb']) + "G -d " + bootDisks[0]['type'] + " " + vmPathDest + "/" + disk_filename)
+
+                self.create_disk(bootDisks[0], vmPathDest + "/" + disk_filename)
 
                 vmxDict.update({"scsi0:0.devicetype": "scsi-hardDisk"})
                 vmxDict.update({"scsi0:0.present": "TRUE"})
@@ -821,24 +822,7 @@ class esxiFreeScraper(object):
                 try:
                     (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat " + os.path.dirname(vmxPath) + "/" + disk_filename)
                 except IOError as e:
-                    if 'src' in newDisk and newDisk['src'] is not None:
-                        cloneSrcBackingFile = re.search('^\[(?P<datastore>.*?)\] *(?P<fulldiskpath>.*\/(?P<filepath>(?P<fileroot>.*?)(?:--(?P<diskname_suffix>.*?))?\.vmdk))$', newDisk['src']['backing_filename'])
-                        try:
-                            (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath'))
-                        except IOError as e:
-                            return (cloneSrcBackingFile.group('fulldiskpath') + " not found!\n" + str(e))
-                        else:
-                            if newDisk['src']['copy_or_move'] == 'copy':
-                                self.esxiCnx.exec_command("vmkfstools -i /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " -d thin " + os.path.dirname(vmxPath) + "/" + disk_filename)
-                            else:
-                                self.esxiCnx.exec_command("vmkfstools -E /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " " + os.path.dirname(vmxPath) + "/" + disk_filename)
-
-                            # extend(resize) the disk
-                            if 'extend' in newDisk['src']:
-                                self.esxiCnx.exec_command("vmkfstools -X " + str(newDisk['size_gb']) + "G " + os.path.dirname(vmxPath) + "/" + disk_filename)
-
-                    else:
-                        (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(newDisk['size_gb']) + "G -d " + newDisk['type'] + " " + os.path.dirname(vmxPath) + "/" + disk_filename)
+                    self.create_disk(newDisk, os.path.dirname(vmxPath) + "/" + disk_filename)
 
                     # if this is a new disk, not a restatement of an existing disk:
                     if len(curDisks) >= newDiskCount + 2 and curDisks[newDiskCount + 1]['volname'] == newDisk['volname']:
@@ -850,6 +834,28 @@ class esxiFreeScraper(object):
 
         self.put_vmx(vmxDict, vmxPath)
         self.esxiCnx.exec_command("vim-cmd vmsvc/reload " + str(self.moid))
+
+    def create_disk(self, disk, path):
+        if 'src' in disk and disk['src'] is not None:
+            cloneSrcBackingFile = re.search('^\[(?P<datastore>.*?)\] *(?P<fulldiskpath>.*\/(?P<filepath>(?P<fileroot>.*?)(?:--(?P<diskname_suffix>.*?))?\.vmdk))$', disk['src']['backing_filename'])
+            try:
+                (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath'))
+            except IOError as e:
+                return (cloneSrcBackingFile.group('fulldiskpath') + " not found!\n" + str(e))
+            else:
+                if disk['src']['copy_or_move'] == 'copy':
+                    # clone the disk
+                    self.esxiCnx.exec_command("vmkfstools -i /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " -d thin " + path)
+                else:
+                    # rename the disk
+                    self.esxiCnx.exec_command("vmkfstools -E /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " " + path)
+
+                # extend(resize) the disk
+                if 'extend' in disk['src']:
+                    self.esxiCnx.exec_command("vmkfstools -X " + str(disk['size_gb']) + "G " + path)
+
+        else:
+            (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disk['size_gb']) + "G -d " + disk['type'] + " " + path)
 
     # def update_vm_pyvmomi(self, annotation=None):
     #     if annotation:
