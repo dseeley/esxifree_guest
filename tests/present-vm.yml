@@ -1,0 +1,70 @@
+
+hostname: "192.168.1.60"
+username: "root"
+password: "root"
+datastore: "datastore1"
+name: "test-esxifree_guest"
+moid: null
+state: present
+force: False
+template: null
+annotation: ""
+guest_id: ubuntu-64
+hardware:
+  version: 15
+  num_cpus: 2
+  memory_mb: 4096
+disks:
+  - size_gb: 20
+    type: "thin"
+    boot: true
+    src:
+      backing_filename: "[datastore1] /jammy-server-cloudimg-amd64.vmdk"
+      copy_or_move: "copy"
+      extend: true
+cdrom:
+  - type: iso
+    iso_path: "/vmfs/volumes/datastore1/ubuntu-22.04.3-live-server-amd64.iso"
+  - type: iso
+    iso_path: "/vmfs/volumes/datastore1/ubuntu-cloudinit.iso"
+networks:
+  - networkName: VM Network
+    virtualDev: vmxnet3
+    cloudinit_netplan:
+      version: 2
+      ethernets:
+        ens192:
+          addresses:
+            - 192.168.1.210/24
+          dhcp4: false
+          gateway4: 192.168.1.2
+          nameservers:
+            addresses:
+              - 192.168.1.2
+            search:
+              - local.dougalseeley.com
+cloudinit_userdata:
+  #cloud-config
+  runcmd:
+    - echo 'cloud-init vmware datasource initialization completed!' > /var/tmp/cloud-init-cmd.txt
+
+  users:
+    - default
+
+  system_info:
+    default_user:
+      name: ubuntu
+      plain_text_passwd: 'ubuntu'
+      home: /home/ubuntu
+      shell: /bin/bash
+      lock_passwd: false
+      gecos: Ubuntu
+      groups: [adm, cdrom, dip, lxd, sudo]
+
+  ssh_pwauth: true
+
+  package_update: true
+delete_cloudinit: False
+customvalues: []
+wait: false
+wait_timeout: 180

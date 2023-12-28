@@ -140,7 +140,7 @@ options:
   disks:
     description:
     - A list of disks to add (or create via cloning).
-    - Resizing disks is not supported.
+    - Support resizing disks after added.
     - Removing existing disks of the virtual machine is not supported.
     required: false
     type: list
@@ -183,10 +183,21 @@ options:
             choices: [copy, move]
   cdrom:
     description:
+    - A list of cdrom to add.
     - A CD-ROM configuration for the virtual machine.
-    - Valid attributes are:
-    -  - C(type) (string): The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.
-    -  - C(iso_path) (string): The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).
+    required: false
+    type: list
+    suboptions:
+      type:
+        description:
+        - The type of CD-ROM, valid options are C(none), C(client) or C(iso). With C(none) the CD-ROM will be disconnected but present.
+        required: true
+        type: str
+      iso_path:
+        description:
+        - The datastore path to the ISO file to use, in the form of C([datastore1] path/to/file.iso). Required if type is set C(iso).
+        required: false
+        type: str
   wait:
     description:
     - On creation, wait for the instance to obtain its IP address before returning.
@@ -265,7 +276,8 @@ EXAMPLES = r'''
      - {"boot": true, "size_gb": 16, "type": "thin"}
      - {"size_gb": 2, "type": "thin", "volname": "test_new"}
      - {"size_gb": 1, "type": "thin", "volname": "test_clone", "src": {"backing_filename": "[datastore1] linux_dev/linux_dev--webdata.vmdk", "copy_or_move": "copy"}}],
-    cdrom: {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.4-server-amd64.iso"},
+    cdrom: 
+     - {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.4-server-amd64.iso"}
     networks:
       - networkName: VM Network
         virtualDev: vmxnet3
@@ -374,15 +386,17 @@ else:
 try:
     from ansible.module_utils.basic import AnsibleModule
 except:
-    # For testing without Ansible (e.g on Windows)
-    class cDummyAnsibleModule():
-        def __init__(self):
-            self.params={}
-        def exit_json(self, changed, **kwargs):
-            print(changed, json.dumps(kwargs, sort_keys=True, indent=4, separators=(',', ': ')))
-        def fail_json(self, msg):
-            print("Failed: " + msg)
-            exit(1)
+    pass
+
+# For testing without Ansible (e.g on Windows)
+class cDummyAnsibleModule():
+    def __init__(self):
+        self.params={}
+    def exit_json(self, changed, **kwargs):
+        print(changed, json.dumps(kwargs, sort_keys=True, indent=4, separators=(',', ': ')))
+    def fail_json(self, msg):
+        print("Failed: " + msg)
+        exit(1)
 
 # Executes soap requests on the remote host.
 class vmw_soap_client(object):
@@ -712,18 +726,20 @@ class esxiFreeScraper(object):
             vmxDict.update({"sched.mem.minSize": hardware['memory_mb']})
 
         # CDROM settings
-        if cdrom['type'] == 'client':
-            (stdin, stdout, stderr) = self.esxiCnx.exec_command("find /vmfs/devices/cdrom/ -mindepth 1 ! -type l")
-            cdrom_dev = stdout.read().decode('UTF-8').lstrip("\r\n").rstrip(" \r\n")
-            vmxDict.update({"ide0:0.devicetype": "atapi-cdrom"})
-            vmxDict.update({"ide0:0.filename": cdrom_dev})
-            vmxDict.update({"ide0:0.present": "TRUE"})
-        elif cdrom['type'] == 'iso':
-            if 'iso_path' in cdrom:
-                vmxDict.update({"ide0:0.devicetype": "cdrom-image"})
-                vmxDict.update({"ide0:0.filename": cdrom['iso_path']})
-                vmxDict.update({"ide0:0.present": "TRUE"})
-                vmxDict.update({"ide0:0.startconnected": "TRUE"})
+        if cdrom:
+            for newCDRomIdx, newCDRom in enumerate(cdrom):
+                if newCDRom['type'] == 'client':
+                    (stdin, stdout, stderr) = self.esxiCnx.exec_command("find /vmfs/devices/cdrom/ -mindepth 1 ! -type l")
+                    cdrom_dev = stdout.read().decode('UTF-8').lstrip("\r\n").rstrip(" \r\n")
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".devicetype": "atapi-cdrom"})
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".filename": cdrom_dev})
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".present": "TRUE"})
+                elif newCDRom['type'] == 'iso':
+                    if 'iso_path' in newCDRom:
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".devicetype": "cdrom-image"})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".filename": newCDRom['iso_path']})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".present": "TRUE"})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".startconnected": "TRUE"})
 
         # Network settings
         cloudinit_nets = {"version": 2}
@@ -773,7 +789,8 @@ class esxiFreeScraper(object):
         if "scsi0:0.filename" not in vmxDict:
             if len(bootDisks) == 1:
                 disk_filename = self.name + "--boot.vmdk"
-                (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(bootDisks[0]['size_gb']) + "G -d " + bootDisks[0]['type'] + " " + vmPathDest + "/" + disk_filename)
+
+                self.create_disk(bootDisks[0], vmPathDest + "/" + disk_filename)
 
                 vmxDict.update({"scsi0:0.devicetype": "scsi-hardDisk"})
                 vmxDict.update({"scsi0:0.present": "TRUE"})
@@ -819,20 +836,7 @@ class esxiFreeScraper(object):
                 try:
                     (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat " + os.path.dirname(vmxPath) + "/" + disk_filename)
                 except IOError as e:
-                    if 'src' in newDisk and newDisk['src'] is not None:
-                        cloneSrcBackingFile = re.search('^\[(?P<datastore>.*?)\] *(?P<fulldiskpath>.*\/(?P<filepath>(?P<fileroot>.*?)(?:--(?P<diskname_suffix>.*?))?\.vmdk))$', newDisk['src']['backing_filename'])
-                        try:
-                            (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath'))
-                        except IOError as e:
-                            return (cloneSrcBackingFile.group('fulldiskpath') + " not found!\n" + str(e))
-                        else:
-                            if newDisk['src']['copy_or_move'] == 'copy':
-                                self.esxiCnx.exec_command("vmkfstools -i /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " -d thin " + os.path.dirname(vmxPath) + "/" + disk_filename)
-                            else:
-                                self.esxiCnx.exec_command("vmkfstools -E /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " " + os.path.dirname(vmxPath) + "/" + disk_filename)
-
-                    else:
-                        (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(newDisk['size_gb']) + "G -d " + newDisk['type'] + " " + os.path.dirname(vmxPath) + "/" + disk_filename)
+                    self.create_disk(newDisk, os.path.dirname(vmxPath) + "/" + disk_filename)
 
                     # if this is a new disk, not a restatement of an existing disk:
                     if len(curDisks) >= newDiskCount + 2 and curDisks[newDiskCount + 1]['volname'] == newDisk['volname']:
@@ -844,6 +848,28 @@ class esxiFreeScraper(object):
 
         self.put_vmx(vmxDict, vmxPath)
         self.esxiCnx.exec_command("vim-cmd vmsvc/reload " + str(self.moid))
+
+    def create_disk(self, disk, path):
+        if 'src' in disk and disk['src'] is not None:
+            cloneSrcBackingFile = re.search('^\[(?P<datastore>.*?)\] *(?P<fulldiskpath>.*\/(?P<filepath>(?P<fileroot>.*?)(?:--(?P<diskname_suffix>.*?))?\.vmdk))$', disk['src']['backing_filename'])
+            try:
+                (stdin, stdout, stderr) = self.esxiCnx.exec_command("stat /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath'))
+            except IOError as e:
+                return (cloneSrcBackingFile.group('fulldiskpath') + " not found!\n" + str(e))
+            else:
+                if disk['src']['copy_or_move'] == 'copy':
+                    # clone the disk
+                    self.esxiCnx.exec_command("vmkfstools -i /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " -d thin " + path)
+                else:
+                    # rename the disk
+                    self.esxiCnx.exec_command("vmkfstools -E /vmfs/volumes/" + cloneSrcBackingFile.group('datastore') + "/" + cloneSrcBackingFile.group('fulldiskpath') + " " + path)
+
+                # extend(resize) the disk
+                if 'extend' in disk['src']:
+                    self.esxiCnx.exec_command("vmkfstools -X " + str(disk['size_gb']) + "G " + path)
+
+        else:
+            (stdin, stdout, stderr) = self.esxiCnx.exec_command("vmkfstools -c " + str(disk['size_gb']) + "G -d " + disk['type'] + " " + path)
 
     # def update_vm_pyvmomi(self, annotation=None):
     #     if annotation:
@@ -892,7 +918,7 @@ def main():
         "hardware": {"type": "dict", "default": {"version": "21", "num_cpus": "2", "memory_mb": "2048", "num_cpu_cores_per_socket": "1", "hotadd_cpu": "False", "hotadd_memory": "False", "memory_reservation_lock": "False"}},
         "cloudinit_userdata": {"type": "dict", "default": {}},
         "disks": {"type": "list", "default": [{"boot": True, "size_gb": 16, "type": "thin"}]},
-        "cdrom": {"type": "dict", "default": {"type": "client"}},
+        "cdrom": {"type": "list", "default": []},
         "networks": {"type": "list", "default": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}]},
         "customvalues": {"type": "list", "default": []},
         "wait": {"type": "bool", "default": True},
@@ -904,19 +930,23 @@ def main():
     else:
         # For testing without Ansible (e.g on Windows)
         module = cDummyAnsibleModule()
-        ## Update VM
-        module.params = {
-            "hostname": "192.168.1.30",
-            "username": "root",
-            "password": sys.argv[2],
-            # "annotation": "{'Name': 'dougal-test-dev-sysdisks2-a0-1617548508', 'hosttype': 'sysdisks2', 'env': 'dev', 'cluster_name': 'dougal-test-dev', 'owner': 'dougal', 'cluster_suffix': '1617548508', 'lifecycle_state': 'retiring', 'maintenance_mode': 'false'}",
-            "annotation": None,
-            "disks": None,
-            "name": "test",
-            "moid": None,
-            "state": "unchanged",
-            "wait_timeout": 180
-        }
+
+        with open(sys.argv[2], 'r') as file:
+            module.params = yaml.safe_load(file)
+
+        # ## Update VM
+        # module.params = {
+        #     "hostname": "192.168.1.30",
+        #     "username": "root",
+        #     "password": sys.argv[2],
+        #     # "annotation": "{'Name': 'dougal-test-dev-sysdisks2-a0-1617548508', 'hosttype': 'sysdisks2', 'env': 'dev', 'cluster_name': 'dougal-test-dev', 'owner': 'dougal', 'cluster_suffix': '1617548508', 'lifecycle_state': 'retiring', 'maintenance_mode': 'false'}",
+        #     "annotation": None,
+        #     "disks": None,
+        #     "name": "test",
+        #     "moid": None,
+        #     "state": "unchanged",
+        #     "wait_timeout": 180
+        # }
 
         # ## Delete VM
         # module.params = {
@@ -935,7 +965,7 @@ def main():
         #     "password": sys.argv[2],
         #     "annotation": None,
         #     # "annotation": "{'lifecycle_state': 'current', 'Name': 'test-prod-sys-a0-1589979249', 'cluster_suffix': '1589979249', 'hosttype': 'sys', 'cluster_name': 'test-prod', 'env': 'prod', 'owner': 'dougal'}",
-        #     "cdrom": {"type": "client"},
+        #     "cdrom": [{"type": "client"}],
         #     "cloudinit_userdata": [],
         #     "customvalues": [],
         #     "datastore": "4tb-evo860-ssd",
@@ -972,7 +1002,7 @@ def main():
         #     "hardware": {"version": "21", "num_cpus": "2", "memory_mb": "2048"},
         #     "cloudinit_userdata": [],
         #     "disks": [{"boot": True, "size_gb": 16, "type": "thin"}, {"size_gb": 5, "type": "thin"}, {"size_gb": 2, "type": "thin"}],
-        #     "cdrom": {"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.2-server-amd64.iso"},
+        #     "cdrom": [{"type": "iso", "iso_path": "/vmfs/volumes/4tb-evo860-ssd/ISOs/ubuntu-18.04.2-server-amd64.iso"}],
         #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3"}],
         #     "customvalues": [],
         #     "wait": True,
@@ -1057,7 +1087,7 @@ def main():
             (stdin, stdout, stderr) = iScraper.esxiCnx.exec_command("vim-cmd vmsvc/power.getstate " + str(iScraper.moid))
             if re.search('Powered off', stdout.read().decode('UTF-8')) is not None:
                 response, cookies = iScraper.soap_client.send_req('<PowerOnVM_Task><_this type="VirtualMachine">' + str(iScraper.moid) + '</_this></PowerOnVM_Task>')
-                if iScraper.soap_client.wait_for_task(xmltodict.parse(response.read())['soapenv:Envelope']['soapenv:Body']['PowerOffVM_TaskResponse']['returnval']['#text'], int(module.params['wait_timeout'])) != 'success':
+                if iScraper.soap_client.wait_for_task(xmltodict.parse(response.read())['soapenv:Envelope']['soapenv:Body']['PowerOnVM_TaskResponse']['returnval']['#text'], int(module.params['wait_timeout'])) != 'success':
                     module.fail_json(msg="Failed to PowerOnVM_Task")
             else:
                 response, cookies = iScraper.soap_client.send_req('<RebootGuest><_this type="VirtualMachine">' + str(iScraper.moid) + '</_this></RebootGuest>')
