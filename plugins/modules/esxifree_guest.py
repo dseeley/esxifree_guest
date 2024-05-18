@@ -388,15 +388,19 @@ try:
 except:
     pass
 
+
 # For testing without Ansible (e.g on Windows)
 class cDummyAnsibleModule():
     def __init__(self):
-        self.params={}
+        self.params = {}
+
     def exit_json(self, changed, **kwargs):
         print(changed, json.dumps(kwargs, sort_keys=True, indent=4, separators=(',', ': ')))
+
     def fail_json(self, msg):
         print("Failed: " + msg)
         exit(1)
+
 
 # Executes soap requests on the remote host.
 class vmw_soap_client(object):
@@ -731,15 +735,15 @@ class esxiFreeScraper(object):
                 if newCDRom['type'] == 'client':
                     (stdin, stdout, stderr) = self.esxiCnx.exec_command("find /vmfs/devices/cdrom/ -mindepth 1 ! -type l")
                     cdrom_dev = stdout.read().decode('UTF-8').lstrip("\r\n").rstrip(" \r\n")
-                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".devicetype": "atapi-cdrom"})
-                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".filename": cdrom_dev})
-                    vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".present": "TRUE"})
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) + ".devicetype": "atapi-cdrom"})
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) + ".filename": cdrom_dev})
+                    vmxDict.update({"ide0:" + str(newCDRomIdx) + ".present": "TRUE"})
                 elif newCDRom['type'] == 'iso':
                     if 'iso_path' in newCDRom:
-                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".devicetype": "cdrom-image"})
-                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".filename": newCDRom['iso_path']})
-                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".present": "TRUE"})
-                        vmxDict.update({"ide0:" + str(newCDRomIdx) +  ".startconnected": "TRUE"})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) + ".devicetype": "cdrom-image"})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) + ".filename": newCDRom['iso_path']})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) + ".present": "TRUE"})
+                        vmxDict.update({"ide0:" + str(newCDRomIdx) + ".startconnected": "TRUE"})
 
         # Network settings
         cloudinit_nets = {"version": 2}
@@ -753,18 +757,26 @@ class esxiFreeScraper(object):
             else:
                 vmxDict.update({"ethernet" + str(netCount) + ".addresstype": "generated"})
             vmxDict.update({"ethernet" + str(netCount) + ".present": "TRUE"})
-            if "cloudinit_netplan" in networks[netCount]:
-                cloudinit_nets.update(networks[netCount]['cloudinit_netplan'])
+
+            # Add default dhcp networking for undefined networks.
+            if ('cloudinit_netplan' not in networks[netCount]) or (any(x not in ['ethernets', 'wifis'] for x in networks[netCount]['cloudinit_netplan'])):
+                cloudinit_nets.setdefault('ethernets', {})
+                cloudinit_nets['ethernets'].update({'eth' + str(netCount): {'dhcp4': True, 'dhcp-identifier': "mac"}})
+            # Configure netplan networks
+            if 'cloudinit_netplan' in networks[netCount]:
+                for ifacetype_key, ifacetype_val in networks[netCount]['cloudinit_netplan'].items():
+                    cloudinit_nets.setdefault(ifacetype_key, {})
+                    for iface_key, iface_val in ifacetype_val.items():
+                        cloudinit_nets[ifacetype_key].update({iface_key: iface_val})
+                        if ifacetype_key == "ethernets":
+                            # Force guest to use the MAC address as the DHCP identifier, in case the machine-id is not reset for each clone
+                            cloudinit_nets[ifacetype_key][iface_key].update({'dhcp-identifier': "mac"})
 
         # Add cloud-init metadata (hostname & network)
-        cloudinit_metadata = {"local-hostname": self.name}
+        cloudinit_metadata = {'local-hostname': self.name}
         if 'ethernets' in cloudinit_nets and cloudinit_nets['ethernets'].keys():
-            # Force guest to use the MAC address as the DHCP identifier, in case the machine-id is not reset for each clone
-            for cloudeth in cloudinit_nets['ethernets'].keys():
-                cloudinit_nets['ethernets'][cloudeth].update({"dhcp-identifier": "mac"})
-            # Add the metadata
-            cloudinit_metadata.update({"network": base64.b64encode(yaml.dump(cloudinit_nets, width=4096, encoding='utf-8')).decode('ascii'), "network.encoding": "base64"})
-        vmxDict.update({"guestinfo.metadata": base64.b64encode(yaml.dump(cloudinit_metadata, width=4096, encoding='utf-8')).decode('ascii'), "guestinfo.metadata.encoding": "base64"})
+            cloudinit_metadata.update({"network": base64.b64encode(yaml.dump(cloudinit_nets, width=4096, encoding='utf-8')).decode('ascii'), 'network.encoding': 'base64'})
+        vmxDict.update({'guestinfo.metadata': base64.b64encode(yaml.dump(cloudinit_metadata, width=4096, encoding='utf-8')).decode('ascii'), 'guestinfo.metadata.encoding': 'base64'})
 
         # Add cloud-init userdata (must be in MIME multipart format)
         if cloudinit_userdata and len(cloudinit_userdata):
@@ -933,6 +945,30 @@ def main():
 
         with open(sys.argv[2], 'r') as file:
             module.params = yaml.safe_load(file)
+
+        # ## test elaborate networks config
+        # module.params = {
+        #     "hostname": "192.168.1.31",
+        #     "username": "root",
+        #     "password": sys.argv[2],
+        #     "datastore": "vdisks",
+        #     "name": "test-asdf",
+        #     "annotation": "{'Name': 'test-asdf'}",
+        #     "delete_cloudinit": False,
+        #     "force": False,
+        #     "moid": None,
+        #     "template": None,
+        #     "state": "present",
+        #     "guest_id": "ubuntu-64",
+        #     "hardware": {"version": "21", "num_cpus": "2", "memory_mb": "2048"},
+        #     "cloudinit_userdata": [],
+        #     "disks": [{"boot": True, "size_gb": 16, "type": "thin"}],
+        #     "cdrom": None,
+        #     "networks": [{"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit_netplan": {"ethernets": {"eth0": {"dhcp4": False, "addresses": ["192.168.1.36/24"], "gateway4": "192.168.1.1", "nameservers": {"addresses": ["192.168.1.2", "8.8.8.8", "8.8.4.4"], "search": ["{{_dns_nameserver_zone}}"]}}}}}, {"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit_netplan": {"ethernets": {"eth1": {"dhcp4": True}}}}, {"networkName": "VM Network", "virtualDev": "vmxnet3", "cloudinit_netplan": {"vlans": {"vlan25": {"id": 25, "link": "eth2", "addresses": ["192.168.2.132/25"]}}}}, {"networkName": "VM Network", "virtualDev": "vmxnet3"}],
+        #     "customvalues": [],
+        #     "wait": True,
+        #     "wait_timeout": 180
+        # }
 
         # ## Update VM
         # module.params = {
