@@ -5,7 +5,7 @@ def PROJECT_URL_DEFAULT = "https://github.com/dseeley/esxifree_guest"
 def PROJECT_BRANCH_DEFAULT = "master"       //Set the default git branch to use if we're not running an SCM job (e.g. if we're copying/pasting into a pipeline script)
 
 def pypi_ansible = ["curl", "-s", "-H", "Accept: application/json", "-H", "Content-type: application/json", "GET", "https://pypi.org/pypi/ansible/json"].execute().text
-def pypi_ansible_latest = new groovy.json.JsonSlurper().parseText(pypi_ansible).releases.keySet()[-1]
+def pypi_ansible_latest = new groovy.json.JsonSlurper().parseText(pypi_ansible).info.version        // Use `info.version` instead of `.releases.keySet()[-1]`, to avoid alpha and release candidate versions
 
 //This allows us to create our own Docker image for this specific use-case.  Once it is built, it will not be rebuilt, so only adds delay the first time we use it.
 def create_custom_image(image_name, build_opts = "") {
@@ -16,26 +16,20 @@ def create_custom_image(image_name, build_opts = "") {
         def jenkins_gid = sh(script: "id -g  ${jenkins_username}", returnStdout: true).trim()
 
         def dockerfile = """
-            FROM ubuntu:22.04
+            FROM ubuntu:24.04
             ARG DEBIAN_FRONTEND=noninteractive
             ENV JENKINS_HOME=${env.JENKINS_HOME}
             ENV HOME=${env.JENKINS_HOME}
-            ENV PIPENV_VENV_IN_PROJECT=true
             ENV TZ=Europe/London
             SHELL ["/bin/bash", "-c"]
 
             RUN groupadd -g ${jenkins_gid} ${jenkins_username} && useradd -m -u ${jenkins_uid} -g ${jenkins_gid} -s /bin/bash ${jenkins_username}
-            ### Note: use pip to install pipenv (not apt) to avoid pypa/pipenv#2196 (when using PIPENV_VENV_IN_PROJECT)
             RUN apt-get update \
-                && apt-get install -y git iproute2 python3-boto python3-boto3 python3-dev python3-distutils python3-docker python3-dnspython python3-google-auth python3-googleapi python3-jinja2 python3-jmespath python3-libcloud python3-libvirt python3-lxml python3-netaddr python3-paramiko python3-passlib python3-pip python3-pyvmomi python3-ruamel.yaml python3-setuptools python3-wheel python3-xmltodict \
-                && pip3 --no-cache-dir install pycdlib pipenv ansible==${params.ANSIBLE_VERSION}
+                && apt-get install -y git iproute2 python3-pip python3-jmespath python3-jinja2 python3-boto3 python3-netaddr python3-paramiko python3-libvirt python3-lxml python3-xmltodict python3-pycdlib python3-google-auth python3-dev python3-setuptools python3-wheel \
+                && pip3 --no-cache-dir install --break-system-packages ansible==${params.ANSIBLE_VERSION}
 
-            ### Install community.libvirt:==1.2.0 if our Ansible version is < 6.3.0 (it is otherwise included in the pypi release) and azure.azcollection:==1.13.0 if our Ansible version is <= 6.0.0 (it is otherwise included in the pypi release)
-            RUN if [ \$(echo -e "\$(pip3 --no-cache-dir show ansible | grep ^Version | sed -r 's/^Version: (.*)/\\1/')\\n6.4.0"|sort|head -1) != "6.4.0" ]; then ansible-galaxy collection install community.libvirt:==1.2.0 -p \$(pip3 --no-cache-dir show ansible | grep ^Location | sed 's/Location: \\(.*\\)/\\1/') --force && chown -R jenkins.jenkins ~/.ansible; fi \
-                && if [ \$(echo -e "\$(pip3 --no-cache-dir show ansible | grep ^Version | sed -r 's/^Version: (.*)/\\1/')\\n6.1.0"|sort|head -1) != "6.1.0" ]; then ansible-galaxy collection install azure.azcollection:==1.13.0 -p \$(pip3 --no-cache-dir show ansible | grep ^Location | sed -r 's/Location: (.*)/\\1/') --force && chown -R jenkins.jenkins ~/.ansible; fi
-
-            ### Install the azcollection/requirements-azure.txt dependencies (in the default python library location)
-            RUN pip3 --no-cache-dir install -r \$(pip3 --no-cache-dir show ansible | grep ^Location | sed -r 's/^Location: (.*)/\\1/')/ansible_collections/azure/azcollection/requirements-azure.txt
+            ### Install the azcollection/requirements[-azure].txt dependencies (in the default python library location)
+            RUN pip3 --no-cache-dir install --break-system-packages -r \$(pip3 --no-cache-dir show ansible | grep ^Location | sed -r 's/^Location: (.*)/\\1/')/ansible_collections/azure/azcollection/requirements*.txt
             """.stripIndent()
 
         writeFile(file: "Dockerfile_${image_name}", text: dockerfile, encoding: "UTF-8")

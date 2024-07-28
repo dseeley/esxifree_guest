@@ -28,5 +28,5 @@ homepage: https://github.com/dseeley/esxifree_guest
 
 issues: https://github.com/dseeley/esxifree_guest/issues
 
-build_ignore: [ '.idea', '.gitignore' ]
+build_ignore: [ '.idea', '.gitignore', 'Dockerfile*' ]
 
